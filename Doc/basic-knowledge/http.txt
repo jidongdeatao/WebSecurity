@@ -1,0 +1,159 @@
+1.1 HTTP请求格式
+<request line>
+<headers>
+<blank line>
+<request-body>]
+
+e.g.1  GET请求
+
+GET /rds/rest/me HTTP/1.1
+Host: 10.175.38.41
+Connection: keep-alive
+cftk: I6VZ-GLNV-DZTH-AY6R-Y415-KOH7-MBKF-TV9O
+X-Language: zh-cn
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.152 Safari/537.36
+Content-Type: application/json; charset=UTF-8
+region: southchina
+Accept: */*
+X-Requested-With: XMLHttpRequest
+ProjectName: southchina
+AgencyId: f10acf06019a47f4b1421918177f96f4
+Referer: https://10.175.38.41/rds/?agencyId=f10acf06019a47f4b1421918177f96f4&region=southchina&locale=zh-cn
+Accept-Encoding: gzip, deflate, sdch
+Accept-Language: zh-CN,zh;q=0.8
+Cookie: ttl=2017299267; IAMIdentity=X-F1064304358-2-200-8go0abpuyyp31qnrwymst34472dixknfh8tcp1qh6setd0h56g; J_SESSION_ID="{43e8dd629ea6fda559017bf686fe86fd058baf4a4eeb5f2a}"; cftk=I6VZ-GLNV-DZTH-AY6R-Y415-KOH7-MBKF-TV9O; locale=zh-cn; ttf=1593421056
+
+
+e.g.2  POST请求1
+
+POST /rds/rest/checkoutRdsName HTTP/1.1       
+Host: 10.175.38.41                 
+Connection: keep-alive
+Content-Length: 22
+Origin: https://10.175.38.41
+X-Language: zh-cn
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.152 Safari/537.36
+region: southchina
+Accept: */*
+X-Requested-With: XMLHttpRequest
+Content-Type: application/json; charset=UTF-8
+ProjectName: southchina
+AgencyId: f10acf06019a47f4b1421918177f96f4
+cftk: I6VZ-GLNV-DZTH-AY6R-Y415-KOH7-MBKF-TV9O
+Referer: https://10.175.38.41/rds/?agencyId=f10acf06019a47f4b1421918177f96f4&region=southchina&locale=zh-cn
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.8
+Cookie: ttl=2017299267; IAMIdentity=X-F1064304358-2-200-8go0abpuyyp31qnrwymst34472dixknfh8tcp1qh6setd0h56g; J_SESSION_ID="{43e8dd629ea6fda559017bf686fe86fd058baf4a4eeb5f2a}"; cftk=I6VZ-GLNV-DZTH-AY6R-Y415-KOH7-MBKF-TV9O; locale=zh-cn; ttf=1593421056
+
+{"rdsName":"rdszkn6"}
+
+e.g.3  POST请求3
+html4strict代码
+POST /rds/rest/rds/instances/prepare HTTP/1.1
+Host: 10.175.38.41
+Connection: keep-alive
+Content-Length: 527
+Origin: https://10.175.38.41
+X-Language: zh-cn
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.152 Safari/537.36
+region: southchina
+Accept: */*
+X-Requested-With: XMLHttpRequest
+Content-Type: application/json; charset=UTF-8
+ProjectName: southchina
+AgencyId: f10acf06019a47f4b1421918177f96f4
+cftk: I6VZ-GLNV-DZTH-AY6R-Y415-KOH7-MBKF-TV9O
+Referer: https://10.175.38.41/rds/?agencyId=f10acf06019a47f4b1421918177f96f4&region=southchina&locale=zh-cn
+Accept-Encoding: gzip, deflate
+Accept-Language: zh-CN,zh;q=0.8
+Cookie: ttl=2017299267; IAMIdentity=X-F1064304358-2-200-8go0abpuyyp31qnrwymst34472dixknfh8tcp1qh6setd0h56g; J_SESSION_ID="{43e8dd629ea6fda559017bf686fe86fd058baf4a4eeb5f2a}"; cftk=I6VZ-GLNV-DZTH-AY6R-Y415-KOH7-MBKF-TV9O; locale=zh-cn; ttf=1593421056
+
+{"rdsName":"rds-aee5","orderid":"RDSH4KC8UPSUNDWBP54","subnetId":"e66328ac-63d9-46e1-9bc7-004b1ec596f4","vpcId":"c63fed71-81d9-4d4a-baff-52874e8aa695","regionId":"southchina","availableZoneId":"12c47a78666b4e438cd0c692b9860387","networkType":"rds","masterIds":null,"rdsProductId":"257915de7f084dcd979tu806eae4m94c","volumeProductId":"099befcc586443ad820ca5fca8a93a7d","dbProductId":"dcac8d2299dc4deb91138899d658231b","securityGroupId":"5ec55184-e82c-4c67-bc73-1263674a9a82","volumeSize":100,"dbInfo":null,"backupStrategy":null}
+
+1.2 HTTP响应格式：
+<status line>
+<headers>
+<blank line>
+[<response-body>]
+
+
+e.g.1 GET响应
+HTTP/1.1 200 OK
+Server: Web Server
+Date: Wed, 02 Mar 2016 07:09:03 GMT
+Content-Type: application/json;charset=UTF-8
+Connection: keep-alive
+Keep-Alive: timeout=65
+Set-Cookie: ttf=1593421056;path=/
+Set-Cookie: ttl=2017299267;path=/rds
+Expires: Wed, 02 Mar 2016 07:09:02 GMT
+Cache-Control: no-cache
+Strict-Transport-Security: max-age=31536000; includeSubdomains;
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+X-Download-Options: noopen
+X-XSS-Protection: 1; mode=block;
+Content-Length: 653
+
+{"projectId":"5c2e5fde92e1498091925f24d2d2593b","userVersion":"new"}
+
+
+e.g.2 POST响应1
+HTTP/1.1 200 OK
+Server: Web Server
+Date: Wed, 02 Mar 2016 07:13:07 GMT
+Content-Type: application/json;charset=UTF-8
+Connection: keep-alive
+Keep-Alive: timeout=65
+Set-Cookie: ttf=1593421056;path=/
+Set-Cookie: ttl=2017299267;path=/rds
+X-Frame-Options: SAMEORIGIN
+Cache-Control: no-cache
+X-Content-Type-Options: nosniff
+X-Download-Options: noopen
+X-XSS-Protection: 1; mode=block
+Expires: Wed, 02 Mar 2016 07:13:06 GMT
+Strict-Transport-Security: max-age=31536000; includeSubdomains;
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+X-Download-Options: noopen
+X-XSS-Protection: 1; mode=block;
+Content-Length: 95
+
+{"resultCode":0,"resultDesc":"该名称可用*","timeFormat":"2016-03-02 07:18:01 GMT+08:00"}
+
+
+e.g.3 POST响应2
+HTTP/1.1 200 OK
+Server: Web Server
+Date: Wed, 02 Mar 2016 07:07:58 GMT
+Content-Type: application/json;charset=UTF-8
+Connection: keep-alive
+Keep-Alive: timeout=65
+Set-Cookie: ttf=1593421056;path=/
+Set-Cookie: ttl=2017299267;path=/rds
+X-Frame-Options: SAMEORIGIN
+Cache-Control: no-cache
+X-Content-Type-Options: nosniff
+X-Download-Options: noopen
+X-XSS-Protection: 1; mode=block
+Expires: Wed, 02 Mar 2016 07:07:57 GMT
+Strict-Transport-Security: max-age=31536000; includeSubdomains;
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+X-Download-Options: noopen
+X-XSS-Protection: 1; mode=block;
+Content-Length: 113
+
+{"resultCode":1101,"resultDesc":"创建实例请求下发失败！","timeFormat":"2016-03-02 07:12:53 GMT+08:00"}
+
+
+1.3 HTTP响应常见错误码： http://3ms.huawei.com/hi/group/2025745/blog_1143453.html?mapId=3110725
+       状态码的第一位数字定义响应类别。后两位数字没有任何分类角色。第一位数字有五种值：
+-1xx ：报告的 -请求被接收到，继续处理
+-2xx ：成功 - 被成功地接收（received），理解（understood），接受(accepted)的动作
+-3xx ：重发 - 为了完成请求必须采取进一步的动作。
+-4xx ：客户端出错 - 请求包括错的语法或不能被满足。
+-5xx ：服务器出错 - 服务器无法完成显然有效的请求。 
+
+
