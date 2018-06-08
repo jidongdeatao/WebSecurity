@@ -1,0 +1,1031 @@
+说明
+参数校验是网络安全最基本的要求，在公司发布的所有语言的安全编码规范中都有明确对参数校验的要求。但是还是有很多因为参数校验导致的安全问题，对于编码规范的要求，每年都组织了很多赋能，有培训、考试、案例学习等等，但是还是不能根除。不严格的参数校验可能会导致命令注入、SQL注入、XML实体注入、XSS、反序列化代码注入等问题，影响恶劣。
+根据已知的参数校验问题，个人总结了一些如下原因：
+1.	参数校验遗漏，对于外部输入的参数都是不可信的，在对接口参数进行校验的时候，不仅仅指对用户输入的参数进行校验，只要是来自外部输入并且在服务端会使用的参数都需要校验，例如：一个接口通过表单传递了参数serviceName，但是服务的在处理请求的时候，还会从请求头Host中获取参数，如果只对serviceName进行了校验，那么可能通过请求头中的Host参数就能对系统造成攻击。
+2.	参数校验太简单，在检视代码时，常常发现大家对外部输入的String字符串只进行了判空校验。但是从规格上分析，并不是所有字符都是必须的，而且一般用户的输入都是有长度限制的。例如：某接口有一个参数serviceName在业务规格上只允许使用字母、数组、下划线，并且serviceName的长度最长是128个字符，那么在服务端对serviceName的校验就应该通过白名单的方式校验，只允许字母、数字、下划线和长度小于等于128个字符的参数允许通过。如果开发人员对参数的规格不清楚或者参数的规格没有约束限制，应该在和SE确认下是否规格是否严谨，尽量约束最小范围的规格。接口应该进行详细设计，并对每个接口参数进行明确的规格描述说明。
+3.	参数运用的场景没有进行风险分析，参数校验并不是名满足业务规格的白名单就能解决所有的安全风险。还要分析参数运用的场景做相应的转义、编码等。例如：如果参数用于拼接SQL语句执行，那么要考虑SQL注入的风险，需要使用参数预编译处理的方式执行SQL预计或对特殊字符进行转义，如果参数用于拼接URL，那么要考虑对参数进行URL编码等等。下面会针对已知的风险点列举需要考虑的场景。（参考附录一）
+4.	参数有多种使用场景，但是校验只校验了一种场景，有些接口的逻辑处理很复杂，同一个参数在整改接口处理过程中有多个地方会使用，但是这个参数只校验了其中的一种场景或校验场景没有全部覆盖。例如：某个接口有一个参数fileName，是在上传文件的时候外部输入的文件名，在对fileName进行校验的时候，只针对文件上传的场景校验了文件名后缀，但是在接口代码的内部，还会对文件进行修改权限，执行系统命令会使用到文件名，执行完后还会把文件名存储到数据库。在后面的场景中可能存在命令注入和SQL注入。在检视代码的时候，整个接口的逻辑要从始到终全部都弄清楚，特别是别人写的代码。
+5.	认为参数来自内部，不需要校验，有些参数不去是来自外部输入，例如：java中通过System.getProperties获取的jvm参数、System.getenv获取环境变量参数，这些参数一般都在系统启动前设置好，但是不能保证在运行过程中不会被别的代码修改，在同一个进程中这些方法获取的参数是全局的，如果存在别的方法修改了，也可能存在风险。最好严格按照编码规范的要求，即使是从服务器上读取的配置文件或系统参数在试用前都要进行严格校验。
+由于业务场景复杂，参数形式多样化，编码人员风格习惯不统一等因素，导致参数校验不能统一，本文主要介绍参数校验的要求和常见的参数校验的代码样例，希望开发能参考，落实好安全编码规范要求。
+安全参数校验总则
+1.	采用白名单方式校验参数，在满足业务场景的情况下，尽可能的最小化参数的范围。例如：实例ID只包含字母数字，那么校验的时候只允许包含字母数字的参数允许通过。
+2.	所有参数都校验长度或范围，长度或范围在满足业务场景情况下，尽量限制最小。
+3.	所有使用到的外部参数都要进行参数校验，包含请求头参数、表单参数、Url参数等。
+4.	必须包含特殊字符的参数，需要根据使用场景进行相应的特殊字符转义或编码。
+5.	所有参数都要在服务端进行校验, 客户端参数校验主要解决用户体验的问题，不能解决安全问题。
+6.	如果采用正则表达式进行参数校验，一定要对表达式进行严格的测试验证和检视，特别是复杂的正则表达式，复杂的正则表达式往往容易隐藏漏洞、ReDOS，特别是对正则表达式不是特别熟练的开发人员，一定要慎重考虑。
+1	常见参数校验
+说明：这里字符串型参数主要是指外部输入字符串参数，一般长度限制较短，参数中可以包含字母、数值、符号等，但是根据业务场景不同对字符有一定的限制。
+1.1	xx名称
+参数说明：几乎每个服务都会涉及带“名称”的参数，一般主要包含字母、数值、下划线、中划线，长度小于等于64位，根据业务场景不同，略有差异。例如：
+	队列名称
+	函数名称
+	工作流名称
+	节点名称
+	工程名称
+	流水线名称
+	微服务名称
+	模板名称
+	堆栈名称
+	Job名称
+	别名名称
+	……
+样例：建议对名称的规格约束为只允许字母数字下划线和横杠，如果需要其他特殊字符，根据使用场景对其他特殊字符进行转义或特殊处理，相关方法参考本文档中“参数注入防护”章节。
+public static boolean isValidName(String name)
+    {
+        if (name == null)
+        {
+            return false;
+        }
+        
+        String patternString = "[a-zA-Z0-9-_]{1,64}";
+        return Pattern.matches(patternString, name);
+}
+1.2	描述
+参数说明：几乎每个服务都会涉及带“描述”的参数，但是由于描述内容较广泛，大部分都无法约束输入字符的范围，长度一般为256个字符，根据业务需求不同，范围也有差异。对于参数中的特殊字符，根据使用场景都要进行相应的转义或特殊处理，防止XSS、命令注入、SQL注入等问题，相关方法参考本文档中“参数注入防护”章节。 
+样例1：使用预编译处理的方式保存信息到数据库，如果使用其他数据库处理框架例如mybatis等，需要配置使用预编译处理的方式执行SQL语句。除了数据库存储外，其他场景也需要对特殊字符进行处理，如：前台展示描述信息前需要进行html转码等。
+public int insertMigrateTask(Map<String, String> data) throws SQLException
+    {
+        DataSource dataSource = DataSourceCenter.getInstance()
+                .getDBDataSource(USER_DB);
+        Connection conn = dataSource.getConnection();
+        String sql = "insert into tbl_migrateTask "
+                + "(id, instance_id, name, description) "
+                + "values (?, ?, ?, ?)";
+        
+        String id = data.get("id");
+        String instenceId = data.get("instenceId");
+        String name = data.get("name");
+        String description = data.get("description");
+        
+        return execUpdate(conn, sql, id, instenceId, name, description);
+    }
+    
+    public int execUpdate(Connection conn, String sql, Object... args) 
+            throws SQLException
+    {
+        PreparedStatement ps = conn.prepareStatement(sql);
+        try
+        {
+            for (int i = 0; i < args.length; i++)
+            {
+                ps.setObject(i + 1, args[i]);
+            }
+            return ps.executeUpdate();
+        }
+        finally
+        {
+            if (ps != null)
+            {
+                try
+                {
+                    ps.close();
+                }
+                catch (Exception e)
+                {
+                    LOG.error("close ps fail");
+                }
+            }
+        }
+}
+1.3	ID
+参数说明：ID参数一般是是通过服务端生成，多数是由字母数字组成，长度限制较短，比较容易控制。例如：
+	projectID
+	userID
+	domainID
+	GroupID
+	ArtifactID
+	……
+样例1：这里的projectID、userID、domainID是指通过IAM所生成的，参数是一个UUID，只包含字母和数字，长度为32位。对于部分包含特殊字符的ID，根据使用场景对其他特殊字符进行转义或特殊处理，相关方法参考本文档中“参数注入防护”章节。
+    public static boolean isValidProjectID(String pid)
+    {
+        if (pid == null)
+        {
+            return false;
+        }
+        String patternString = "[a-zA-Z0-9]{32}";
+        return Pattern.matches(patternString, pid);
+}
+1.4	选项
+参数说明：选项参数一般为可枚举的参数，必须使用白名单方式校验，只允许用户有权限可选的参数，对于从服务端动态查询的参数，在服务端校验时也要通过动态查询的方式进行校验。
+协议类型：
+参数说明：对于界面上提供给用户可选择的枚举参数，需要校验参数是否在可选范围内。
+样例：通过界面选择服务端支持的协议类型。
+private final static List<String> TYPE = new ArrayList<String>();
+    
+    static 
+    {
+        TYPE.add("FTP");
+        TYPE.add("SFTP");
+        TYPE.add("FTPS");
+        TYPE.add("UDS");
+    }
+    
+    public static boolean isValidType(String type)
+    {
+        return TYPE.contains(type);
+    }
+1.5	IPv4
+参数说明：IPv4地址是比较常见的参数，只包含数字和点号，长度最大为15位。根据业务场景的不同，需要校验的IPv4地址的范围不一样，例如校验的IP的一个白名单，那么应该校验具体的IP地址，如果校验的IP是一个网段的范围，那么应该校验具体的网段的IP地址。IPv4可以通过客户端输入，也可以通过服务端查询到具体的列表。例如：
+	X-Forwarded-For
+	X-Forwarded-Host
+	节点IP
+	连接地址
+	子网
+	VPC网段
+	IP白名单
+	……
+样例1：如果IP只是用来描述一个客户端或者服务端的地址，不会用来作为访问服务的地址，那么可以只需要校验该IP格式是否合法即可，例如记录审计日志中的IP地址。
+   public static boolean isValidIPv4(String ip)
+    {
+        if (ip == null || ip.length() < 7 || ip.length() > 15)
+        {
+            return false;
+        }
+        
+        String regex = "(\\d|[1-9]\\d|1\\d{2}|2[0-4]\\d|25[0-5])"
+                + "(\\.(\\d|[1-9]\\d|1\\d{2}|2[0-4]\\d|25[0-5])){3}";
+return Pattern.matches(regex, ip);
+
+}
+样例2：校验一个范围合法的IPv4地址，这种方法主要用来控制具体的IP白名单，如果白名单是一个网段，按照实际网段做控制即可。
+   public static List<String> ipWhiteList = new ArrayList<>();
+    
+    public static void setIpWhiteList(String ip)
+    {
+        ipWhiteList.add(ip);
+    }
+    
+    public static boolean isValidIPv4(String ip)
+    {
+        return ipWhiteList.contains(ip);  
+    }
+1.6	URL
+参数说明：URI是常用的参数，不合法的URL可能会导致服务端请求伪造、重定向钓鱼攻击等问题根据使用场景的不同，校验规则也有差异。URI主要用于访问服务的API接口或静态资源，可以通过外部直接输入具体的URI，也可以只需要输入部分参数，由系统拼接对应的URI等。例如：
+	OBS链接URL
+	GitHub链接URL
+	Jenkins链接URL
+	参数拼接Rest API
+样例1：通过使用外部参数拼接内部API的URI进行调用时，需要防止/../进行URI伪造，造成服务端请求伪造攻击，建议尽量在拼接URI之前对参数进行白名单校验，白名单不能包含[.]和[/]。如果参数需要包含着两个字符，可以通过URI标准化前后一致性校验或对URI参数进行URL编码的方式解决。
+    public String addProject(String parameter, Map<String, String> data)
+    {
+        // 如果业务上对参数[parameter]可以进行白名单校验，就尽量先进行白名单校验。
+        String uri = "/rest/v1/app/" + parameter;
+        try
+        {
+            // 对uri进行标准化后做校验，防止通过带/../xxx的参数进行URI伪造，造成SSRF
+            URI formatUri = new URI(uri).normalize();
+            if (!uri.equals(formatUri.toString()))
+            {
+                return errorResponse(400, "bad request.");
+            }
+        }
+        catch (URISyntaxException e)
+        {
+            return errorResponse(500, "internal error.");
+        }
+        
+        Result result = HttpClient.post(uri, data);
+        return result.content();
+    }
+样例2：在使用外部输入URL进行内部转调或重定向时，需要对转调的URL的域进行白名单校验，具体白名单可以根据实际业务场景进行控制，主要是防护住被恶意攻击内部服务等。
+
+private final String GITHUB_DOMAIN = "https://www.github.com/";
+    
+    public String updateGithub(String url, Map<String, String> data)
+    {
+        try
+        {
+            URI uri = new URI(url);
+            if (!uri.normalize().toString().startsWith(GITHUB_DOMAIN))
+            {
+                return errorResponse(400, "bad request.");
+            }
+        }
+        catch (URISyntaxException e)
+        {
+            return errorResponse(500, "internal error.");
+        }
+        
+        
+        Result result = HttpClient.post(url, data);
+        return result.content();
+}
+1.7	密码
+参数说明：按照公司安全红线要求，密码长度至少需要满足长度8位，包含大写字母、小写字母、数字、特殊字符至少3中组合，不能和账号相同。并建议支持弱口令字典检查。如果密码用于通过命令行执行，需要对特殊字符进行转义后使用，防止命令注入。另外，密码不允许明文返回到前台，相关接口应该做匿名化处理后在返回消息。
+样例：使用java语言建议使用char数组传递密码，便于使用完后从内存中清除，弱口令字典建议通过配置项配置，样例仅供实现参考。
+private final String LOWCASE = "abcdefghijklmnopqrstuvwxyz";
+    private final String UPCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private final String NUMBERS = "0123456789";
+    private final String SPECIAL = "`~!@#$%^&*()-_=+\\|[{}];:'\",<.>/? ";
+    private final static List<String> WEAKPWD = new ArrayList<String>(); 
+    static
+    {
+        WEAKPWD.add("Huawei@123");
+        WEAKPWD.add("Changeme_123");
+        WEAKPWD.add("Test1234_");
+    }
+    
+    public int checkPwd(char[] value, String userName)
+            throws IllegalArgumentException
+    {
+        if (value == null || value.length < 8 || value.length > 128)
+        {
+            throw new IllegalArgumentException("the pwd is too long or short.");
+        }
+        
+        if (userName == null)
+        {
+            throw new IllegalArgumentException("the userName is invalid.");
+        }
+        
+        if (isSameArray(userName.toCharArray(), value))
+        {
+            throw new IllegalArgumentException("the pwd and username can not same.");
+        }
+        
+        for (String p : WEAKPWD)
+        {
+            if (isSameArray(p.toCharArray(), value))
+            {
+                throw new IllegalArgumentException("the pwd is weak.");
+            }
+        }
+        
+        int count = 0;
+        boolean isContianLowcase = false;
+        boolean isContainUpcase = false;
+        boolean isContainNum = false;
+        boolean isContainSpecial = false;
+        for (int i = 0; i < value.length; i++)
+        {
+            char ch = value[i];
+            if (!isContianLowcase && LOWCASE.contains(String.valueOf(ch)))
+            {
+                isContianLowcase = true;
+                count++;
+            }
+            if (!isContainUpcase && UPCASE.contains(String.valueOf(ch)))
+            {
+                isContainUpcase = true;
+                count++;
+            }
+            if (!isContainNum && NUMBERS.contains(String.valueOf(ch)))
+            {
+                isContainNum = true;
+                count++;
+            }
+            if (!isContainSpecial && SPECIAL.contains(String.valueOf(ch)))
+            {
+                isContainSpecial = true;
+                count++;
+            }
+        }
+        if (count < 3)
+        {
+            throw new IllegalArgumentException("the pwd complex is not enough.");
+        }
+        
+        return 0;
+    }
+    
+    private boolean isSameArray(char[] ch, char[] compareCh)
+    {
+        if (ch.length != compareCh.length)
+        {
+            return false;
+        }
+        
+        for (int i = 0; i < ch.length; i++)
+        {
+            char a = ch[i];
+            char b = compareCh[i];
+            if (a != b)
+            {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+1.8	键值对
+参数说明：由于业务需要，很多自定义参数需要用户自己通过界面自己配置实用，如果服务端对用户输入的参数处理不当，很容易造成安全漏洞。例如：界面设置的环境变量，可能会导致命令注入，XSS等问题，需要进行严格的校验，并且需要对key和value都进行校验，对于特殊场景下必须对部分参数进行转义，例如使用参数执行系统命令等。
+	节点组织
+	环境变量
+样例1：key和value可以进行严格约束时，尽量不要允许特殊字符。如果key和value需要支持更多特殊字符，那么需要根据参数的使用场景进行转义或编码处理。例如：作为执行命令的参数需要进行防命令注入参数转义。返回到前台的参数要进行防XSS转码等。
+public void keysValuesCheck(Map<String, String> data)
+    {
+        if (data == null)
+        {
+            throw new IllegalArgumentException("invalid key value.");
+        }
+        
+        for (String key : data.keySet())
+        {
+            
+            if (key == null || !Pattern.matches("[a-zA-Z0-9_-]{1,32}", key))
+            {
+                throw new IllegalArgumentException("invalid key." + key);
+            }
+            
+            String value = data.get(key);
+            if (value == null || !Pattern.matches("[a-zA-Z0-9_-]{1,32}", value))
+            {
+                throw new IllegalArgumentException("invalid value." + value);
+            }
+        }
+}
+1.9	文件路径
+参数说明：文件路径除了需要对特殊字符进行过滤外，还需要控制路径的白名单，防止越权访问。
+样例：一般情况，建议路径只允许字母数字下划线横杠点号和斜杠，校验前需要进行标准化处理，按照最小授权标准进行白名单控制。
+    public static boolean isValidPath(String path)
+    {
+        if (path == null)
+        {
+            return false;
+        }
+        // 建议路径只支持字母数字下划线横杠点号和斜杠
+        if (!Pattern.matches("[a-z0-9A-Z._/-]{1,255}", path))
+        {
+            return false;
+        }
+        
+        File file = new File(path);
+        try
+        {
+            // 路径在校验前需要先进行标准化
+            String canonicalPath = file.getCanonicalPath();
+            // 下面的校验根据业务场景，如果能通过白名单控制的尽量采用白名单。
+            if (canonicalPath.startsWith("/var/log/temp/"))
+            {
+                return true;
+            }
+        }
+        catch (IOException e)
+        {
+            LOG.error(e.getMessage());
+        }
+        return false;
+}
+1.10	数值型参数
+参数说明：对于数值型参数，只需要校验参数类型和合法的参数范围即可满足安全要求。
+	端口号
+	内存大小
+	批处理大小
+	超时时间
+	Pod数量
+	……
+样例1：对于动态端口号，允许使用的范围是1024-65535，根据实际场景可以缩小控制范围。通过外部参数传递一个动态端监听的端口号时，对端口号进行合法性校验。
+public static boolean isValidPort(String port)
+    {
+        if (port == null)
+        {
+            return false;
+        }
+        if (Pattern.matches("[0-9]{0,5}", port))
+        {
+            int intPort = Integer.valueOf(port);
+            if (intPort>= 1024 && intPort <= 65535)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+样例2：批处理大小合法范围在1-10000之间。
+public static boolean isValidNumber(String num)
+    {
+        if (num == null)
+        {
+            return false;
+        }
+        if (Pattern.matches("[1-9]{0,5}", num))
+        {
+            int intnum = Integer.valueOf(num);
+            if (intnum > 0 && intnum <= 10000)
+            {
+                return true;
+            }
+        }
+        return false;
+}
+1.11	布尔型参数
+参数说明：布尔型参数主要就两种可能，比较容易控制。
+样例：界面可选择是否开启死信的功能，对于这种选项参数，只有两种合法的场景，其余均为非法参数。
+public void addQueues(Map<String, String> data)
+    {
+        String redrivePolicy = data.get("redrive_policy");
+        if ("Enable".equals(redrivePolicy))
+        {
+            addQueusesWithRedrive(data);
+        }
+        else if ("Disable".equals(redrivePolicy))
+        {
+            addQueusesWithoutRedrive(data);
+        }
+        else
+        {
+            throw new IllegalArgumentException("invalid redrivePolicy.");
+        }
+    }
+1.12	文件名
+参数说明：文件名一般建议校验扩展名，同时需要避免空字符截断绕过扩展名校验。
+样例：如果文件名不支持特殊字符，可以先校验白名单，如果需要使用特殊字符，根据使用场景分别需要对文件名参数进行相应的转义和编码。
+public static boolean isValidFileNmae(String fileName)
+    {
+        if (fileName == null)
+        {
+            return false;
+        }
+        
+        for (int i = 0; i < fileName.length(); i++)
+        {
+            if ('\u0000' == fileName.charAt(i))
+            {
+                return false;
+            }
+        }
+        
+        int index = fileName.lastIndexOf('.');
+        if (index <= 0)
+        {
+            return false;
+        }
+        
+        String ext = fileName.substring(index + 1);
+        if ("xml".equals(ext))
+        {
+            return true;
+        }
+        return false;
+    }
+2	参数注入防护
+2.1	命令注入
+说明：使用外部输入参数拼接命令执行的参数时，通过特殊字符对命令行进行截断、改变语义等方式执行非法命令，从而造成服务端非法命令执行。
+样例1：通过对参数中特殊字符进行转义，防止linux系统上命令注入问题。
+public int runConnectCMD(Map<String, String> policy)
+    {
+        int result = -1;
+        
+        String ip = "127.0.0.1";
+        String port = "22";
+        // 以下参数都来自外部输入参数，需要进行参数转义，防止命令注入。
+        String user = encodeForOS(policy.get("ftpUsername"));
+        String ftptype = encodeForOS(policy.get("ftptype"));
+        String path = encodeForOS(policy.get("path"));
+        String resfile = encodeForOS(policy.get("resfile"));
+        String action = encodeForOS(policy.get("action"));
+        
+        String cmd = String.format("%s %s %s %s %s %s %s %s %s", PYTHON, FTP_PY,
+                resfile, ftptype, ip, port, user, action, path);
+        try
+        {
+            Process p = Runtime.getRuntime().exec(cmd);
+            result = handleProcess(p);
+        }
+        catch (IOException e)
+        {
+            LOG.error(e.getMessage());
+        }
+        return result;
+}
+
+    public String encodeForOS(String input)
+    {
+        if (input == null)
+        {
+            return "";
+        }
+        
+        String output = "";
+        String parameter = Normalizer.normalize(input, Form.NFKC);
+        for (int i = 0; i < parameter.length(); i++)
+        {
+            char ch = input.charAt(i);
+            // 对字母和数字以外的字符做转义处理
+            if ((ch >= 48 && ch <= 57) || (ch >= 65 && ch <= 90) 
+                    || (ch >= 97 && ch <= 122))
+            {
+                output += ch;
+            }
+            else
+            {
+                output += "\\" + ch;
+                        
+            }
+        }
+        
+        return output;
+}
+样例2：执行高危命令是，参数需要进行精确化或最小化控制。另外不建议对命令本身通过可变参数传递，那样很难通过对参数进行控制来防止命令注入的风险。
+public void runCMD(String path)
+    {
+        // 对于执行高危命令时，必须进行白名单控制
+        if (!"/var/log/temp/paas/test.sh".equals(path))
+        {
+            throw new RuntimeException("invalid path:" + path);
+        }
+        
+        String cmdline = String.format("%s %s", "sh", path);
+        try
+        {
+            Process p = Runtime.getRuntime().exec(cmdline);
+            handleProcess(p);
+        }
+        catch (IOException e)
+        {
+            LOG.error(e.getMessage());
+        }
+    }
+2.2	XSS
+说明：XSS主要是在浏览器上执行了参数中非法注入的js代码，在浏览器端非法窃取用户数据或对用户进行钓鱼攻击等造成的问题，可以通过对参数进行转义解决问题，转义的步骤可以在服务端代码中处理也可以在客户端js代码中处理，这里主要描述服务端代码处理方法，客户端js处理的逻辑是一样的。
+样例1：至少对参数中包含的 &、<、>、、”、’、/、(、)字符进行转义。
+public static String htmlEncode(String input)
+    {
+        if (input == null)
+        {
+            return input;
+        }
+        String parameter = input;
+        if (parameter.contains("&"))
+        {
+            parameter = parameter.replaceAll("[&]", "&amp;");
+        }
+        if (parameter.contains("<"))
+        {
+            parameter = parameter.replaceAll("[<]", "&lt;");
+        }
+        if (parameter.contains(">"))
+        {
+            parameter = parameter.replaceAll("[>]", "&gt;");
+        }
+        if (parameter.contains("\""))
+        {
+            parameter = parameter.replaceAll("[\"]", "&quot;");
+        }
+        if (parameter.contains("'"))
+        {
+            parameter = parameter.replaceAll("[']", "&#39;");
+        }
+        if (parameter.contains("/"))
+        {
+            parameter = parameter.replaceAll("[/]", "&#47;");
+        }
+        if (parameter.contains("("))
+        {
+            parameter = parameter.replaceAll("[(]", "&#40;");
+        }
+        if (parameter.contains(")"))
+        {
+            parameter = parameter.replaceAll("[)]", "&#41;");
+        }
+        
+        return parameter;
+    }
+样例2：通过前台在web端使用javascript对服务端返回的参数进行转义后使用。
+    escape: (function() {
+		var htmlEscapes = {
+			'&': '&amp;',
+			'<': '&lt;',
+			'>': '&gt;',
+			'"': '&quot;',
+			"'": '&#x27;',
+			'/': '&#x2F;',
+			'(': '&#40;',
+			')': '&#41;'
+		    },
+		    htmlEscaper = /[&<>"'\/()]/g,
+		    tmpStr = '';
+
+		return function(string) {
+		    return (tmpStr + string).replace(htmlEscaper, function(match) {
+				return htmlEscapes[match];
+		    });
+		};
+	}())
+2.3	上传文件
+说明：对于上传文件的场景需要校验文件名，文件类型，文件大小，文件路径等，对于文件内容如果直接作为参数使用，按照上述参数校验要求做参数校验，如果文件是直接存储在服务器上，需要设置文件权限，文件权限建议不超过600。
+样例：
+public void fileUpload(HttpServletRequest request,
+            HttpServletResponse response, PrintWriter out)
+            throws FileUploadException
+    {
+        DiskFileItemFactory factory = new DiskFileItemFactory();
+        factory.setSizeThreshold(1024);
+        ServletFileUpload upload = new ServletFileUpload(factory);
+        upload.setSizeMax(1024);
+        upload.setFileSizeMax(512);
+        List<FileItem> items = upload.parseRequest(request);
+        if (items == null || items.size() > 10)
+        {
+            throw new FileUploadException("upload too much files.");
+        }
+        Iterator<FileItem> itr = items.iterator();
+        while (itr.hasNext())
+        {
+            FileItem item = itr.next();
+            if (!item.isFormField())
+            {
+                // 对文件名，文件类型等进行校验
+                checkFileItem(item);
+                String fileName = item.getName();
+                fileName = Normalizer.normalize(fileName, Form.NFKC);
+                String realName = fileName
+                        .substring(fileName.lastIndexOf("\\") + 1);
+                // 把文件保存到磁盘上
+                int res = writeToDisk(item, "/var/softwares/" + realName);
+                if (res != 0)
+                {
+                    throw new FileUploadException("file saved failed.");
+                }
+            }
+        }
+    }
+
+    private void checkFileItem(FileItem item) throws FileUploadException
+    {
+        if (item == null || item.getSize() <= 0)
+        {
+            throw new FileUploadException("file size is 0.");
+        }
+        String fileName = item.getName();
+        fileName = Normalizer.normalize(fileName, Form.NFKC);
+        String realName = fileName.substring(fileName.lastIndexOf("\\") + 1);
+
+        // 校验文件名
+        String regex = "[0-9A-Za-z][0-9A-Za-z._-]{5,64}";
+        if (!Pattern.matches(regex, realName))
+        {
+            throw new FileUploadException("file name is invalid.");
+        }
+        int index = realName.lastIndexOf('.');
+        if (index <= 0)
+        {
+            throw new FileUploadException("file name is invalid.");
+        }
+        // 校验文件后缀名
+        String ext = realName.substring(index + 1);
+        if ("gz".equals(ext))
+        {
+            throw new FileUploadException("file type is invalid.");
+        }
+        // 校验文件头部
+        String filetypeHex = getFileType(item);
+        if (!filetypeHex.startsWith("1F8B08"))
+        {
+            throw new FileUploadException("file type is invalid.");
+        }
+    }
+
+    private String getFileType(FileItem file)
+    {
+        InputStream is = null;
+        byte[] b = new byte[16];
+        try
+        {
+            is = file.getInputStream();
+            int ret = is.read(b, 0, b.length);
+            if (ret == -1)
+            {
+                return "";
+            }
+        }
+        catch (IOException e)
+        {
+            return "";
+        }
+        finally
+        {
+            if (is != null)
+            {
+                try
+                {
+                    is.close();
+                }
+                catch (IOException e)
+                {
+                    LOG.error("close IOException");
+                }
+            }
+        }
+
+        StringBuilder stringBuilder = new StringBuilder();
+        for (int iByte = 0; iByte < b.length; iByte++)
+        {
+            String hexv = Integer.toHexString(b[iByte] & 0xFF).toUpperCase();
+            if (hexv.length() < 2)
+            {
+                stringBuilder.append(0);
+            }
+            stringBuilder.append(hexv);
+        }
+        return stringBuilder.toString();
+    }
+
+    private int writeToDisk(FileItem item, String fileRealPath)
+    {
+        BufferedInputStream inStream = null;
+        BufferedOutputStream outStream = null;
+
+        try
+        {
+            inStream = new BufferedInputStream(item.getInputStream());
+            outStream = new BufferedOutputStream(new FileOutputStream(
+                    fileRealPath));
+            Streams.copy(inStream, outStream, true);
+            Set<PosixFilePermission> perms = new HashSet<PosixFilePermission>();
+            perms.add(PosixFilePermission.OWNER_READ);
+            perms.add(PosixFilePermission.OWNER_WRITE);
+            Files.setPosixFilePermissions(new File(fileRealPath).toPath(),
+                    perms);
+        }
+        catch (IOException e)
+        {
+            return -1;
+        }
+        finally
+        {
+            if (inStream != null) 
+            {
+                try
+                {
+                    inStream.close();
+                }
+                catch (IOException e)
+                {
+                    LOG.error(e.getMessage());
+                }
+            }
+            if (outStream != null)
+            {
+                try
+                {
+                    outStream.close();
+                }
+                catch (IOException e)
+                {
+                    LOG.error(e.getMessage());
+                }
+            }
+        }
+        return 0;
+}
+2.4	SQL注入
+说明：在使用不可信参数拼接成SQL语句执行时，如果没有对参数进行严格校验或转义，可能导致数据库执行被恶意伪造的SQL语句，对数据库造成恶意攻击。
+样例1：推荐使用预编译处理的方式执行SQL语句，这种方式简单可靠，大大降低了防护SQL注入的难度，如果采用参数校验或者参数转义的方式，对于不同的业务场景和不同的数据库类型可能存在差异，容易出现不严谨的逻辑控制。
+public int ChangePassword(String userName, String pwd) 
+            throws SQLException
+    {
+        DataSource dataSource = DataSourceCenter.getInstance()
+                .getDBDataSource(USER_DB);
+        Connection conn = dataSource.getConnection();
+        String sql = "UPDATE ACCOUNT SET PASSWORD =? WHERE USERNAME =?";
+        
+        return execUpdate(conn, sql, pwd, userName);
+    }
+    
+    public int execUpdate(Connection conn, String sql, Object... args) 
+            throws SQLException
+    {
+        PreparedStatement ps = conn.prepareStatement(sql);
+        try
+        {
+            for (int i = 0; i < args.length; i++)
+            {
+                ps.setObject(i + 1, args[i]);
+            }
+            return ps.executeUpdate();
+        }
+        finally
+        {
+            if (ps != null)
+            {
+                try
+                {
+                    ps.close();
+                }
+                catch (Exception e)
+                {
+                    LOG.error("close ps fail");
+                }
+            }
+        }
+}
+2.5	XML注入
+说明：通过外部参数拼接XML时，如果参数校验不严谨，可能会导致XML注入攻击，XML实体注入攻击等问题，
+样例1：通过禁用实体解析，防止XML实体注入攻击，由于解析XML的第三方库比较多，对于不同的三方库禁用实体解析的方法也略有差异。（其他xml解析库禁用实体解析方法参见附录）
+public Document XMLParse(File file) throws SAXException, IOException, 
+ParserConfigurationException
+    {
+        DocumentBuilderFactory domFactory = DocumentBuilderFactory.newInstance();
+        // 禁止Doctype解析，当XML数据中包含了DTDs内容，代码将会抛出SAXParseException
+        domFacto-ry.setFeature("http://apache.org/xml/features/disallow-doctype-decl"
+                , true);
+        DocumentBuilder builder = domFactory.newDocumentBuilder();
+        Document doc = builder.parse(file);
+        return doc;
+}
+其他XML解析库禁用实体解析的方法参考章节3.1。
+2.6	URL转义
+说明：如果必须使用带特殊字符的参数用来拼接URL，必须先对参数进行URL转码后在使用。
+样例：通过URLEncoder.encode()函数对参数进行转码后在用来构造URL。
+public String addProject(String parameter, Map<String, String> data) 
+            throws UnsupportedEncodingException
+    {
+        // 如果业务上对参数[parameter]可以进行白名单校验，就尽量先进行白名单校验。
+        if (parameter == null)
+        {
+            return errorResponse(400, "bad request.");
+        }
+        
+        // 对拼接URL的参数进行URL转码处理。
+        String uri = "/rest/v1/app/" + URLEncoder.encode(parameter, "UTF-8");
+        Result result = HttpClient.post(uri, data);
+        return result.content();
+}
+2.7	CRLF（换行符注入）
+说明：如果输入中允许输入换行符，那么当输入内容写入到文件中或者作为文本信息返回时，通过换行符截断后，可以在新的行中注入新的内容，破坏文本结构，注入新的信息，例如日志注入，http响应头注入等问题。
+样例：通过对回车换行符转义或过滤，根据业务场景选择处理方式，只要不允许回车换行符生效即可。
+public static String CRLFEncode(String src)
+    {
+        if (src == null || src.isEmpty())
+        {
+            return "";
+        }
+        return src.replace("\r", "\\r").replace("\n", "\\n");
+    }
+3	其他参考：
+3.1	使用JAVA开发语言提供的禁止外部实体解析的方法（参考自公司文档《XXE攻击漏洞共性问题排查指导 V1.2.docx》）
+文档类型定义（DTDs）可定义合法的XML文档构建模块。它使用一系列合法的元素来定义文档的结构。DTDs 可被成行地声明于 XML 文档中，也可作为一个外部引用。DTDs实体是用于定义引用普通文本或特殊字符的快捷方式的变量，可以内部声明或外部引用。
+防止XXE攻击最好的方法是完全禁止解析DTDs。具体的设置方法取决于使用的xml解析器。常用的方式是：
+factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+禁止解析DTDs也会防止被恶意修改的内部实体带来的DOS攻击，例如XML bomb。如果需要使用DTDs的功能，则需要设置禁止解析外部实体和外部的doctypes文件。具体的禁止方法在下面章节详细介绍。
+3.1.1	DOM
+DOM类型的解析器默认情况下不禁用DTDs和实体解析，可以通过调用setFeature方法禁止Doctype解析，禁止外部实体解析，禁止外部参数解析。也可以通过覆写设置实体解析的函数来防御。代码示例如下：
+1.	禁止Doctype解析，当XML数据中包含了DTDs内容，代码将会抛出SAXParseException。 
+DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+// This is the PRIMARY defense. If DTDs (doctypes) are disallowed, almost all XML entity attacks are prevented
+factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+DocumentBuilder builder = factory.newDocumentBuilder();
+InputStream in = new ByteArrayInputStream(xmlString.getBytes());
+org.w3c.dom.Document document = builder.parse(in);
+return document;
+2.	禁止外部实体解析,当XML数据中包含实体变量时，实体变量不会被解析器解析执行。
+DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+facto-ry.setFeature("http://xml.org/sax/features/external-general-entities", false);
+facto-ry.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+DocumentBuilder builder = factory.newDocumentBuilder();
+InputStream in = new ByteArrayInputStream(xmlString.getBytes());
+org.w3c.dom.Document document = builder.parse(in);
+return document;
+3.	禁止外部实体解析，该方式是通过重新设置实体解析的函数，不执行调用的实体解析过程只是返回一个空的实体解析内容。
+DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+DocumentBuilder builder = dbf.newDocumentBuilder();
+// return an empty XML doc
+   builder.setEntityResolver(new EntityResolver() {
+            @Override
+            public InputSource resolveEntity(String publicId, String systemId) throws SAXException,IOException {
+                return new InputSource(new StringReader(""));
+            }
+        });
+Document doc = builder.parse(new File(fileName));
+3.1.2	DOM4J
+DOM4J的解析器SAXReader默认情况下不禁用DTD和实体解析,可以通过设置Feature来完全禁止Doctype解析，禁止外部实体解析，禁止外部参数解析。也可以通过覆写设置实体解析的函数来防御。代码示例如下：
+1.	禁止Doctype解析，当XML数据中包含了DTDs内容，代码将会抛出SAXParseException。 
+SAXReader reader = new SAXReader();
+read-er.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
+Document doc = reader.read(new File(fileName));
+2.	禁止外部实体解析,当XML数据中包含实体变量时，实体变量不会被解析器解析执行。
+SAXReader reader = new SAXReader();
+read-er.setFeature("http://xml.org/sax/features/external-general-entities", false);
+read-er.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+Document doc = reader.read(new File(fileName));
+3.	禁止外部实体解析，该方式是通过重新设置实体解析的函数，不执行调用的实体解析过程只是返回一个空的实体解析内容。
+SAXReader saxReader = new SAXReader();
+// close entity parse funciton
+saxReader.setEntityResolver(new EntityResolver() {
+ @Override
+  public InputSource resolveEntity(String publicId, String systemId) throws SAXException,IOException {
+ return new InputSource(new StringReader(""));
+}
+        });
+Document doc = saxReader.read(new File(fileName));        });
+4.	SAXReader实体解析功能关闭也可以通过覆写createXMLReader方法，将生成的XMLReader类型解析器设置为禁止解析Doctype或者禁止解析实体变量。下面的代码示例是将解析器设置了禁止解析Doctype。代码示例如下：
+public class WSFSaxRead extends SAXReader {
+	public static final String XERCES_FEATURE_PREFIX = "http://apache.org/xml/features/";
+	public static final String DISALLOW_DOCTYPE_DECL_FEATURE = "disal-low-doctype-decl";
+protected XMLReader createXMLReader() throws SAXException {
+SAXParserFactory factory = SAXParserFactory.newInstance();
+try {
+// This is the PRIMARY defense. If DTDs (doctypes) are disallowed, almost all XML entity attacks are prevented
+factory.setFeature(XERCES_FEATURE_PREFIX
++ DISALLOW_DOCTYPE_DECL_FEATURE, true);
+	return factory.newSAXParser().getXMLReader();
+} catch (ParserConfigurationException e1) {
+	throw new SAXException(e1);
+		}
+	}
+}
+3.1.3	JDOM
+解析器SAXBuilder默认情况下不禁用DTD和实体解析，可以通过设置Feature来完全禁止Doctype解析，但不能设置禁止外部实体解析和外部参数解析。同时也可以通过覆写设置实体解析的函数来防御。
+
+1.	禁止Doctype解析，当XML数据中包含了DTD内容，代码将会抛出JDOMParseException。 
+SAXBuilder builder = new SAXBuilder();
+builder.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
+Document doc = builder.build(new File(fileName));
+
+备注：解析器SAXBuilder防止XXE攻击方法需要注意，设置禁止解析实体和实体变量方法不能防止XXE攻击，如下代码是不能生效的。
+
+.setFeature("http://xml.org/sax/features/external-general-entities", false);
+.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+2.	禁止外部实体解析，该方式是通过重新设置实体解析的函数，不执行调用的实体解析过程只是返回一个空的实体解析内容。
+
+SAXBuilder builder = new SAXBuilder();
+// close entity parse funciton
+builder.setEntityResolver(new EntityResolver() {
+            @Override
+public InputSource resolveEntity(String publicId, String systemId) throws SAXEx-ception,IOException {
+      return new InputSource(new StringReader(""));
+            }
+        });
+Document doc = builder.build(new File(fileName));
+3.1.4	SAX
+在使用SAX，SAX类型的解析器默认情况下不禁用DTD和实体解析，可以通过设置解析器的属性来防止外部实体解析。SAX和DOM防御方式相同，均可通过设置Feature来禁止Doctype解析，禁止外部实体解析，禁止外部参数解析。SAX类型解析器有SAXParser和XMLReader，两种解析器都是由SAXParserFactory来创建，解析器防御XXE攻击的方式都一样。下面只给出SAXParserFactory创建的解析器代码示例。
+代码示例如下：
+1.	禁止Doctype解析，当XML数据中包含了DTDs内容，代码将会抛出SAXParseException。 
+SAXParserFactory factory = SAXParserFactory.newInstance();     
+// This is the PRIMARY defense. If DTDs (doctypes) are disallowed, almost all XML entity attacks are prevented
+factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+SAXParser parser = factory.newSAXParser();
+InputStream in = new ByteArrayInputStream(xmltring.getBytes()); 
+parser.parse(in, new HandlerBase());
+2.	禁止外部参数解析,当XML数据中包含实体变量时，实体变量不会被解析器解析执行。
+SAXParserFactory factory = SAXParserFactory.newInstance();     
+factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+SAXParser parser = factory.newSAXParser();
+InputStream in = new ByteArrayInputStream(xmltring.getBytes()); 
+parser.parse(in, new HandlerBase());
+通过XMLReaderFactory来创建XMLReader，代码示例如下：
+1.	禁止Doctype解析，当XML数据中包含了DTDs内容，代码将会抛出SAXParseException。 
+XMLReader spf = XMLReaderFactory.createXMLReader();
+spf.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
+spf.setContentHandler(new MyHandler());  
+spf.parse(new InputSource(new FileInputStream(fileName)));
+2.	禁止外部参数解析,当XML数据中包含实体变量时，实体变量不会被解析器解析执行。
+XMLReader spf = XMLReaderFactory.createXMLReader();
+spf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+spf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+ spf.setContentHandler(new MyHandler());  
+ spf.parse(new InputSource(new FileInputStream(fileName)));
+3.1.5	StAX
+StAX模式是使用XMLInputFactory对xml文件进行解析, 默认情况下不禁用DTD和实体解析，可以通过设置解析器的属性来抵御XXE攻击。代码示例如下：
+1.	禁止Doctype解析,当XML数据中包含了DTDs内容，代码将会抛出XMLStreamException
+XMLInputFactory factory = XMLInputFactory.newInstance();
+xmlInputFactory.setProperty(XMLInputFactory.SUPPORT_DTD, false); XMLStreamReader reader = factory.createXMLStreamReader(externalSource);
+2. 禁止外部参数解析,当XML数据中包含实体变量时，实体变量不会被解析器解析执行
+XMLInputFactory factory = XMLInputFactory.newInstance();
+xmlInputFactory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false); // disable external entities 
+XMLStreamReader reader = factory.createXMLStreamReader(externalSource);
+3.1.6	Xerces
+在使用xerces的jar包中的解析器进行XML操作时，默认情况下不禁用DTD和实体解析，可以通过设置其对应的解析器属性。通用的方式可以设置禁止解析DOCTYPE、外部实体和参数实体的解析方式来防止XXE攻击。代码示例如下：
+1.	禁止Doctype解析，设置禁止包含DOCTYPE、外部实体和参数实体的解析。当XML数据中包含了DTDs内容，代码将会抛出SAXParseException。 
+.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+2.	设置不包括外部实体和参数实体解析，当XML数据中包含实体变量时，实体变量不会被解析器解析执行。
+.setFeature("http://xml.org/sax/features/external-general-entities", false);
+.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+3.1.7	SchemaFactory
+SchemaFactory是用来解析schema文件，schema文件中同样也是可以携带DTDs内容，所以也是有XXE攻击的风险。默认情况下不禁用实体解析，防止SchemaFactory有XXE攻击，可以通过设置禁止解析实体。代码示例如下：
+SchemaFactory factory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema"); 
+factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, ""); 
+factory.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, ""); 
+Schema schema = factory.newSchema(Source); 
+3.1.8	Validator
+schema作用是对xml文件进行校验，校验xml文件时需要生成一个校验器，校验器会解析xml来进行验证，为了防止xml文件中产生XXE攻击，可以通过以下代码设置validator的属性防止XXE攻击。当SchemaFactory中设置了防止XXE攻击的属性时，validator校验器可以不设置属性。Validator默认情况下不禁用实体解析，可以通过设置Propert validator的属性，来禁止实体解析。如下代码示例：
+SchemaFactory factory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema"); 
+Schema schema = factory.newSchema(); 
+Validator validator = schema.newValidator(); 
+validator.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, ""); 
+validator.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");  
+3.1.9	 TransformerFactory
+TransformerFactory是创建Transformer的工厂类， Transformer是执行从源到结果的转换的API。这些接口不依赖于SAX或DOM标准。Transformer会将xml文件源转换成结果树，在解析XML文件时会有XXE攻击风险。默认情况下不禁用解析实体，防止TransformerFactory有XXE攻击可以通过设置属性来防御，请参考如下代码示例: 
+TransformerFactory tf = TransformerFactory.newInstance(); 
+tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, ""); 
+tf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, ""); 
+3.1.10	 SAXTransformerFactory
+SAXTransformerFactory是创建Transformer的工厂类，与TransformerFactory类似。Transformer将xml文件源转换成结果树。默认情况下不禁用解析实体，防止SAXTransformerFactory有XXE攻击攻击可以通过设置属性来防御，请参考如下代码示例: 
+SAXTransformerFactory sf = SAXTransformerFactory.newInstance(); 
+sf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, ""); 
+sf.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, ""); 
+sf.newXMLFilter(Source); 
+3.1.11	 XPathExpression
+XPathExpression和Unmarshaller是一样的，都是自身没有设置安全属性的方法。需要依赖XML解析器的安全属性，所以需要将XML解析器设置为禁止解析Doctype或禁止解析实体和变量。具体设置方式请参考对应的解析器方法，代码示例中是使用DocumentBuilderFactory，如下所示：
+
+DocumentBuilderFactory df =DocumentBuilderFactory.newInstance(); 
+df.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, ""); 
+df.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, ""); 
+builder = df.newDocumentBuilder(); 
+xPathExpression.evaluate( builder.parse(new ByteArrayInputStream(xml.getBytes())) ); 
+3.1.12	 DocumentHelper
+DocumentHelper是DOM4J中提供的解析器，传入xml字符串返回Document对象。调用方法是DocumentHelper.parseText(String text)，该接口里面是定义了SAXReader解析器的局部变量对XML解析,没有途径关闭实体解析方法。考虑到以上以及提出很多其他可以替代的XML解析器，所以禁止使用DocumentHelper解析器。
+
