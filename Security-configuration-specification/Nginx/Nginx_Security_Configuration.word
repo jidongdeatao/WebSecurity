@@ -1,0 +1,613 @@
+1	概述
+1.1	背景简介
+Nginx是一款轻量级的Web服务器/反向代理服务器(负载均衡)及电子邮件（IMAP/POP3）代理服务器。作为Web服务器，通常是与其他web服务器配合使用，实现动静页面分离快速响应。而Nginx最大的特点是对高并发的支持和高效的负载均衡，在高并发的需求场景下，是Apache服务器不错的替代品。本文从安全角度出发，提出了Nginx安全配置操作规范。
+本规范的读者及使用对象主要为Nginx相关的需求分析人员、设计人员、开发人员、测试人员等。
+1.2	适用范围
+本规范的制定考虑了Nginx各版本特性和共性，适合于公司绝大部分使用Nginx开发的Web产品，要求使用Nginx开发的Web产品必须遵循。
+1.3	用词约定
+	规则：强制必须遵守的约定
+	建议：需要加以考虑的约定
+	说明：对此规则或建议进行相应的解释
+	实施指导：对此规则或建议的实施进行相应的指导
+	注意事项：规则引起的注意事项、不适用该规则的地方，简写为注。
+
+
+2	Nginx安全配置规范
+2.1	版本部署运行的策略
+规则2.1.1：	及时更新补丁或升级版本，使用本系列最新最稳定的安全版本
+说明：系统的最原始攻击来自其本身的漏洞，因此一定要做好其漏洞的防护。版本的选择需遵守公司三方件选型和入库标准。尽量选择被评估过的最新最稳定的安全版本。
+实施指导：
+在安全报告http://Nginx.org/en/security_advisories.html上，查找产品当前使用的版本所存在的安全漏洞，并根据安全报告中漏洞的威胁级别，以及产品本身的应用场景，选择下载补丁还是升级系统。
+备注：一般不建议直接打补丁，建议升级到当前系列已被评估过的最新最稳定的安全版本。
+
+建议2.1.1:  最小化安装Nginx，只安装必需模块
+说明:产品可以根据当前Nginx的使用目的，例如Nginx做邮件代理服务器、反向代理服务器或者负载均衡，在安装时尽可能最小化安装，剔除不必要的模块。
+实施指导: 
+在源码安装Nginx的第一步配置：./configure指定增加特定模块或剔除多余模块。通过下面指令可以安装或剔除相应模块，xxx为相应的模块名。
+--without-xxx
+--with-xxx
+产品必须根据当前Nginx使用目的，才可以正确决定最后所使用的模块。
+默认开启的模块
+下表列出的模块默认情况下是开启的，如果当前使用目的不需要使用该模块，建议关闭。
+默认开启的模块	描述
+http_charset_module	charset模块，该模块用于对网页重新编码
+http_gzip_module	Gzip压缩模块
+http_userid_module	用户ID模块。该模块为用户通过cookie验证身份
+http_ssi_module	服务端包含模块
+http_access_module	访问模块，对于指定的IP段，允许访问配置
+http_auth_basic_module	基本的认证模块
+http_autoindex_module	自动索引模块
+http_geo_module	Geo模块，该模块允许你定义依赖于IP地址段的变量
+http_map_module	Map模块，该模块允许你声明map区段
+http_referer_module	Referer控制模块
+http_rewrite_module	Rewriter模块
+http_proxy_module	代理模块。该模块用于向其他服务器传输请求。
+http_fastcgi_module	FastCGI模块。该模块是用于与FastCGI进程配合工作。
+http_memcached_module	Memcahed模块。该模块是用于与memcached守护进程配合工作
+http_limit_zone_module	Limit Zone模块。该模块是用于根据定义的zone来限制约束对资源的使用
+http_limit_req_module	Limit Requests模块。该模块允许你限制每个用户请求的总数
+http_empty_gif_module	Empty Gif模块。该模块用于在内存中提供一个空白的GIF图像
+http_browser_module	Browser模块。该模块用于解释用户代理字符串
+http_upstream_ip_hash_module	Upstream模块。该模块用于配置负载均衡结构。
+
+规则2.1.2：	用于运行Nginx的用户必须是一个没有系统特权（非root）的用户
+说明：使用特权用户运行不符合最小授权原则。如果Nginx应用存在安全漏洞（比如XSS、注入漏洞等），恶意代码的执行权限就只是运行Nginx的帐号权限。例如，如果Nginx是以root身份运行的，不巧Nginx应用存在注入漏洞或缓冲溢出漏洞（通常是使用了高危的字符串处理函数，而且对外部输入没有做有效的检查），被攻击者发现了，利用该漏洞注入或植入了恶意代码，并且成功的让CPU执行了这段恶意代码。这个时候恶意代码也是以root身份运行的，可以执行任意操作，包括创建后台用户，导致整个系统被攻击者控制。如果该进程使用非root帐号来运行，即使该进程被攻击，植入了恶意代码，但恶意代码拥有的权限有限，无法对整个系统造成破坏，减少了损失。
+实施指导：
+如果启动Nginx进程的用户是root,在Nginx主配置文件nginx.conf使用指令user来指定Nginx执行用户。如果启动进程用户是非root，不需要单独配置也满足该要求。
+#运行用户,例如指定nginx运行用户是是www-data.
+user www-data;
+
+
+规则2.1.3：	隐藏或伪装Nginx的版本及版本相关提示信息
+说明：在Nginx新版本发布后，公布旧版本的漏洞，黑客极容易获得这些信息，并针对更新不及时或者补丁未打的Nginx进行攻击。由此可见，版本号对黑客来说是最有价值的。
+实施指导：
+方法一：
+通过修改配置文件Nginx.conf。
+1．	访问Nginx.conf， 在http服务器中配置指令server_tokens为off。如：
+http {
+         …
+server_tokens off;
+…
+}
+方法二：
+从源码修改或者伪装Nginx的版本信息。
+1．	在编译安装之前，找到core/Nginx.h文件；
+2．	修改Nginx.h头部
+#define NGINX_VERSION "0.6.39"
+#define NGINX_VER "Nginx/" NGINX_VERSION
+可选择修改为
+#define NGINX_VERSION "1.0.0"
+#define NGINX_VER "WebServer/" NGINX_VERSION
+规则2.1.4：	删除安装过程文件、缺省安装的管理帮助文件及用户测试类的非必需文件
+说明：默认的示例或测试应用容易被远程访问或执行，给系统带来相当的危害。
+实施指导：
+1．	删除安装过程文件：                      //安装后删除
+   rm –rf /tmp/Nginx-1.5.8                     //以1.5.8版本为例
+2．	删除删除用户测试类的非必需文件，如默认文件。
+rm -rf /usr/Nginx/html
+
+规则2.1.5：	Nginx作为web服务器时，部署的不同实例必须在独立的环境中运行
+说明：每个实例应该拥有自己的独立运行环境，即使某一个实例被攻破，不至于造成其他实例沦陷。这里的独立环境是指每个实例都使用独立的进程、运行用户、网络端口以及资源目录等，相互隔离。
+实施指导：
+下面以在Nginx部署两个web实例为例，说明具体配置过程。
+1、	单独为每个实例创建独立的配置文件web-instance-1.conf和web-instance-2.conf
+Web-instance-1.conf的内容如下：
+user  Nginxuser-1 Nginxgroup;
+#配置运行用户，不使用系统用户。
+worker_processes  1;
+… …
+events {
+   … …
+}
+
+http {
+  …  …
+
+    server {
+        listen       8091;
+        server_name  10.93.185.168;
+
+        location /web-instance-1 {
+            root   /usr/local/Nginx-1.9.12/web-instance-1;
+            #配置实例-1的运行的环境
+            index  index.html index.htm;
+…  …
+        }
+}
+
+Web-instance-2.conf的内容如下：
+user  Nginxuser-2 Nginxgroup;
+#配置运行用户，不使用系统用户。
+worker_processes  1;
+… …
+events {
+    … …
+}
+
+http {
+  …  …
+
+    server {
+        listen       8092;
+        server_name  10.93.185.168;
+
+        location /web-instance-2 {
+            root   /usr/local/Nginx-1.9.12/web-instance-2;
+         #配置实例-2的运行的环境
+            index  index.html index.htm;
+…  …
+        }
+}
+
+注:为每个实例进行配置文件后，在sbin目录下执行执行指定配置文件的命令。
+./Nginx –c /usr/local/Nginx-1.9.12/conf/web-instance-1.conf
+./Nginx –c /usr/local/Nginx-1.9.12/conf/web-instance-2.conf
+如果Nginx重新启动后，指定各个实例的配置文件需要重新执行上面的命令。
+建议2.1.2:  增大Nginx的最大并发链接数
+说明：Nginx安装好后，默认的最大并发数为1024。如果并发数超过了1024，那么就需要修改worker_connection值，在nginx.conf配置文件中添加worker_rlimit_nofile和worker
+_connection指令。
+实施指导：
+… …
+work_process auto;
+worker_rlimit_nofile 65535；
+#worker_rlimit_nofile 指定Nginx进程可以打开的最大文件描述符数量
+event
+ {
+use epoll;
+#use指令说明Nginx所使用的事件模型，不同类型的操作系统，适合的实事件模型不同。
+#kqueue、epoll、eventport分别属于FreeBSD、Linux、Solaris操作系统中高效的事件模#型。
+worker_connection 65535;
+#每个进程能处理的连接数
+}
+注：
+1、	work_process值设置与当前系统的cpu核数相关，如果不是很确定的话，设置为auto后，Nginx会自动获取合适值。如果确定核数，可将worker_process与worker_cpu_affinity结合使用。
+2、	如果不添加worker_rlimit_nofile，启动Nginx后，会出现worker_connection exceed open file resource limit：1024警告。例如，Linux 2.6内核下开启文件数为65535，woker_rlimit_nofile就相应填写65535。所以worker_connection值为65535，但是不可以超过worker_rlimit_nofile.
+2.2	基本配置的安全策略
+规则2.2.1：	禁用不必要的http方法：DELETE、PUT、TRACE、OPTIONS等
+说明：Nginx的反向代理功能，有一部分请求转发到后端服务器上，并从后端服务器上读取响应，发回客户端。后端可能有Tomcat或者Apache服务器，默认http方法包括GET、HEAD、POST、PUT、DELETE、OPTIONS等方法。在这些方法中，虽然PUT、DELETE方法很少被使用到，但可能被利用来进行攻击。对于web服务来讲标准的请求只使用GET，POST和HEAD，其它方法不使用的需要禁止掉。例外：如果确实是业务需要使用（例如Restful接口需要使用GET,POST,PUT,DELETE），则不强制要求。
+实施指导：
+方法一：
+1．	在Nginx.conf配置所允许的http方法。
+语法：limit_except method 
+... {...}
+配置块：location。
+例如：
+ http {
+     …
+      Server {
+           …
+            location / {
+                  #http请求方法在全目录“/”下，除了GET POST HEAD，均禁止
+#认返回403错误
+                    limit_except GET POST HEAD
+{
+                        deny all;
+}
+}
+}
+}
+方法二：
+1.	在Nginx.conf针对某一个http方法禁止，根据业务需求。
+     if ($request_method = PUT ) {
+return 403;
+}
+if ($request_method = DELETE ) {
+return 403;
+}
+
+
+规则2.2.2：	禁止安装WebDAV
+说明：WebDAV（Web-based Distributed Authoring and Versioning）是基于 HTTP 1.1 的一个通信协议。它为 HTTP 1.1 添加了一些扩展（就是在 GET、POST、HEAD 等几个 HTTP 标准方法以外添加了一些新的方法），使得应用程序可以直接将文件写到 Web Server 上，并可在线更新文件内容，在写文件时候可以对文件加锁，写完后对文件解锁，还可以支持对文件所做的版本控制。这虽然带来一定易用性，但使用不当容易引入安全风险。默认情况下应禁止安装WebDAV，如果因特殊场景需要使用WebDAV，必须满足下面几点要求：
+1）	上层Web应用的使用者必须经过认证，即上层web应用用户需要经过认证才可以使用WebDAV服务，没有经过认证的服务或应用不可以使用；
+2）	使用WebDAV时必须使用https接口，即Nginx需要开启SSL/TLS；
+3）	WebDAV的使用必须记录日志，开启Nginx的访问日志即可。
+WebDAV模块名为http_dav_module，默认情况下是没有安装的，如果要安装，需要在configure文件中配置--with-http_dav_module。
+
+规则2.2.3：	定制Nginx出错信息
+说明：Nginx发生服务器端出错时（例如：Nginx在找不到网页时，会报404错误），错误页面上经常会附带当前服务器版本号，还可能泄露其他服务器端信息。黑客可以通过版本号，查询当前Nginx服务器的默认配置信息，以及该版本的安全漏洞。如果出错页面带有版本号等敏感信息，则必须对出错信息进行定制。
+实施指导：
+在配置文件Nginx.conf配置出错信息，配置模块主在server，如下： 
+1.对5xx和4xx的错误统一配置。
+ server {
+   …
+   error_page 500 501   /50x.html;
+   location = /50x.html {
+   #html是Nginx自创建的目录，50x.html是自配置的出错提示信息
+root  html
+}
+#关于4xx类型的错误，同上
+error_page  400 401 402 403 404 405 406 407 413 414 /4xx.html;
+location = /4xx.html{
+root  html;
+}
+}
+备注：
+出错提示信息的网页大小必须大于512个字节，否则IE会自动调用自己的友好提示界面。特别提醒，禁止给响应码302配置错误页面，否则所有重定向都将指向该错误页面。<location>的配置值是自定义错误页面相对于当前Web应用的根目录的路径，需要根据自定义错误页面的实际路径配置。
+
+规则2.2.4：	禁止开启Nginx的目录列表功能
+说明：如果访问NGINX下的一个web应用，如果输入是一个目录名，而且该目录下没有一个默认访问文件，那么Nginx会将该目录下的所有文件列出来，这种敏感信息泄露是严格禁止的。Nginx默认的是关闭目录列表，但是为了程序调试方便，部分程序员也有可能开启这一功能。因此，要确认该项配置是否正确。
+实施指导：
+在配置文件Nginx.conf中，修改autoindex参数的值为off。或者该参数没有出现（默认情况下是关闭目录列表功能）：
+在location server段或者http段，
+           http {
+            ...
+           autoindex off;
+            ...
+}
+
+规则2.2.5：	禁止Nginx重定向至监听端口
+说明：可以从Nginx的核心模块中得知，如果请求发生重定向，Nginx默认的情况下，是会在重定向的URL后自动添加Nginx当前站点监听的端口。这样明显会对服务器造成很大的威胁，后端端口暴露出来，就可能会被人直接对这个端口进行诸如CC类攻击。
+实施指导：
+1、	在配置文件Nginx.conf中的http段、或server段或location端增加禁止指令，建议在http段添加，如下：
+http {
+   ...
+#Nginx will not add the port in the url when the request is redirected
+   port_in_redirect off;
+   ...
+   Server {
+   ...
+}
+...
+}
+
+规则2.2.6：	绑定特定IP地址
+说明：Nginx安装好后需要绑定在主机特定的接口IP地址上，以限制外部的访问通道，禁止绑定在0.0.0.0。需要按照下面方法进行配置，不配置或默认的配置都是绑定到0.0.0.0。
+实施指导：
+server{
+listen  99.69.16.3:80; #这里绑定到特定的IP和端口
+....
+}
+
+规则2.2.7：	限制允许访问的IP
+说明：Nginx允许限制某些IP地址的客户端访问，限制IP访问可以保护Nginx避免DDOS攻击。
+举个例子：
+location/ {
+    deny  192.168.1.1;
+    allow 192.168.1.0/24;
+    allow 10.1.1.0/16;
+    allow 2001:0db8::/32;
+    deny  all;
+}
+注：规则按照顺序依次检测，直到匹配到第一条规则。 在这个例子里，IPv4的网络中只有 10.1.1.0/16 和 192.168.1.0/24允许访问，但 192.168.1.1除外, 对于IPv6的网络，只有2001:0db8::/32允许访问。
+对于系统本身只是作为中间件，无法确切知道IP范围的情况，可以通过在资料中进行提醒，并说明配置方式。对于无法确定来源IP范围的场景（如面向公网的产品）不强制要求。
+
+规则2.2.8：	限制http请求的消息主体和消息头的大小
+说明：此指令给了服务器管理员更大的可控性，以控制客户端不正常的请求行为，
+自定义缓存以限制缓冲区溢出攻击。
+实施指导：
+在配置文件Nginx.conf调整请求头和请求体的缓冲区大小：
+http{
+        ... ...
+    server{
+        ... ...
+#Nginx默认会用client_header_buffer_size这个buffer来读取header值，
+#如果header过大，它会使用large_client_header_buffers来读取。
+client_header_buffer_size  1k;
+#参数含义是申请4个8k的请求头缓冲区
+large_client_header_buffers  4  8k;
+#缓冲客户端请求的最大字节
+        client_body_buffer_size  16K;
+#客户端请求的最大单文件字节数
+        client_max_body_size  1m;
+        ... ...
+          }
+     }
+备注：以上所定义的缓冲区大小是建议值。在报文请求过程中，报“Request URL too large”（414）或者“Bad-request”(400)错误，则须增加缓冲区大小。产品如果有特殊需要可以根据自身的需求，进行相应调整。
+
+规则2.2.9：	配置Nginx的网络超时时间
+说明：配置Nginx的超时时间，提高服务器的性能，降低客户端的等待时间。同时，在受到DOS攻击时，可以起到缓解作用。特殊情况下，请根据具体性能需求进行调优。
+实施指导：
+在配置文件nginx.conf中的http段配置超时：
+http {
+       ... ...
+       #客户端请求主体读取超时时间，如果在这个时间后客户端还没有发送任何数据，#Nginx返回“Request time out（408）”错误，默认值是60。
+       client_body_timeout   10;
+       #客户端请求头读取超时时间，如果在这个时间后客户端还没有发送任何数据，#Nginx返回“Request time out（408）”错误,默认值是60.
+       client_header_timeout  10;
+       #第一个参数指定客户端连接保持活动的超时时间，在这个时间之后，服务器会关
+#掉连接，第二个参数是可选的，它指定了消息头保持活动的有效时间，它可以告
+#诉某些浏览器关闭连接，因此服务器就不必关闭连接了，如果没有这个参数，Nginx
+#不会发送Keep-Alive头。第一个参数默认是75。
+       keepalive_timeout  5  30;
+       #指定响应客户端的超时时间，这个超时仅限于两个阅读活动之间的时间，如果这
+#个时间后客户端没有任何活动，Nginx将会关闭连接。
+       send_timeout          10;
+       ... ...
+      }
+备注：如果产品有特殊性能需求，经过风险评估后可以进行相应调整。
+
+规则2.2.10：	隐藏 X-Powered-By HTTP头
+说明：x-powered-By表示网站是用什么技术开发的，它会泄漏开发语言、版本号和框架等信息，有安全隐患，需要隐藏掉。可采用以下措施：
+在nginx.conf使用指令proxy_hide_header 指令隐藏它
+proxy_hide_header     X-Powered-By; 
+如果使用的php语言，需要在php.ini中添加
+expose_php = Off;
+如果是Nginx+Tomcat架构，请参考《Tomcat安全配置规范》中的规则2.2.15进行配置。
+如果是Nginx+fastcgi+php架构，隐藏信息是无效的，需要采用以下措施：
+server {
+        ... ...
+         #该location段只供参考，但如果是执行php文件段，都可以使用fastcgi_hide_header
+#隐藏X-Powered-By信息
+         location ~ ^/.+\.php(\/.*)?$ {
+         ... ...
+                     fastcgi_hide_header X-Powered-By ;
+        ... ...
+                                      }
+        ... ...  }
+
+2.3	文件目录的控制权限
+规则2.3.1：	Nginx根目录只能由root或Nginx运行用户修改，Nginx根目录的所有父级目录的修改权限不能赋予除root和Nginx运行用户的其他普通用户
+说明：不仅文件本身，Nginx根目录必须只能由属主来改写，Nginx根目录的所有父级目录的修改权限不能赋予除root和Nginx运行用户的其他普通用户。如果Nginx根目录的某一父级目录的修改权限可以被其它普通用户拥有，那这个用户就可以删除这个父级目录下面原来的目录或文件然后新建同名的目录或文件，达到对目录下所有文件进行篡改控制的目的。
+实施指导：
+如果要配置Nginx根目录为/etc/nginx，首先要确认/、/etc目录只能由root修改，/etc/nginx目录只有root或Nginx运行用户才有修改权限，其他用户不能具备这些目录的修改权限。
+
+规则2.3.2：	Nginx配置文件属主必须是root或Nginx启动用户，且只能允许root用户或Nginx启动用户修改
+说明：其它用户有可能会覆盖配置文件，从而获取更高的权限或者更多的信息。
+实施指导：
+chown root:root /etc/nginx/nginx.conf  #如果启动Nginx为其它非root用户，则改为其它用户
+chmod 600 /etc/nginx/nginx.conf      #如果有特殊要求需要同组可读可设置成640
+如果nginx.conf中include了其它的配置文件，则其它配置文件的文件属主和权限也要同样设置，例如nginx.conf中有这样的语句：include /etc/nginx/conf/*.conf，执行下列命令：
+chown –R root:root /etc/nginx/conf
+chmod -R 600 /etc/nginx/conf
+
+规则2.3.3：	日志文件属主只能是Nginx运行用户，且只允许属主可读写
+说明：Nginx日志文件包括错误日志和访问日志。两类日志必须都只允许其属主（Nginx运行用户）可读写，如果日志文件本身对非属主用户是可写的，别人就可能伪造日志。
+实施指导：
+如果Nginx运行用户为www，执行下列命令：
+chown www:www /var/log/nginx/error.log
+chmod 600 /var/log/nginx/error.log
+chown www:www /var/log/nginx/access.log
+chmod 600 /var/log/nginx/access.log
+注意：日志文件的上级目录也只能允许Nginx运行用户可写。
+
+规则2.3.4：	Web应用目录及文件属主只能是root或Nginx运行用户，且只允许属主可读写执行
+说明：Nginx是可以直接响应静态页面，也有Web应用目录，限制其他用户对这些应用目录的访问，可以防止本地用户恶意或无意地影响Web应用程序的完整性。
+实施指导：
+Nginx的Web应用目录是/www, Nginx运行用户为www的话，执行下列命令：
+chown –R www:www /etc/nginx/www
+chmod –R 700 /etc/nginx/www
+
+2.4	SSI配置策略
+规则2.4.1：	禁用SSI功能
+说明： SSI指令可以用于执行JVM外部的程序，防止出现SSI注入等安全问题，所以禁止使用SSI功能。
+实施指导： 
+Nginx默认是关闭SSI功能，如果在配置文件nginx.conf的http段、server段或location段出现ssi on，务必设置为ssi off。
+
+
+2.5	日志审计策略
+开启Nginx的日志功能：正常的访问日志和错误请求日志。
+说明：这些日志可以提供异常访问的线索。Nginx可以记录所有的访问请求，同样，异常的请求也会记录。日志文件可以记录系统发生的重要事件，可以帮助我们找到安全事件的原因等等，因此，日志文件要尽可能的包含访问的关键信息，例如访问时间、内容、结果、请求用户的ip、访问的网址等。
+实施指导：
+在配置文件Nginx.conf中，在<Engine>的<host>标签里添加如下内容，在http段声明日志文件：
+http {
+…
+#在目录/var/log/nginx/下配置一个访问日志文件，日志格式按照main来打印，压缩后写入。
+access.log /var/log/nginx/access.log main gzip;
+…
+}
+在上文配置信息中的main格式名，是用来配置日志基本格式的。
+一般情况下，定义日志格式：
+http {
+…
+#main是格式名，日志打印格式可按照此定义，具体可根据实际情况确定。
+log_format  main  '$remote_addr - $remote_user [$time_local] "$request"'
+                      '$status $body_bytes_sent "$http_referer" '
+                      ' "$http_user_agent" "$http_x_forwarded_for" ';
+…
+}
+参数值的具体含义如下：
+$remote_addr	客户端的ip地址（如果中间有代理服务器那么这里显示的ip就为代理服务器的ip地址）
+$remote_user	用于记录远程客户端的用户名称（一般为“-”）
+$request	用于记录请求的url以及请求方法，这里注意需要进行检查，如果URL中可能包含敏感信息，就不要将其记录到日志里
+$status	响应状态码
+$body_bytes_sent	给客户端发送的文件主体内容大小
+$http_referer	可以记录用户是从哪个链接访问过来的
+$http_user_agent	用户所使用的代理（一般为浏览器）
+$http_x_forwarded_for	可以记录客户端IP，通过代理服务器来记录客户端的ip地址
+
+
+另外，为了防止日志文件过大，需要定时对日志文件进行切割压缩。Nginx访问日志自身支持日志文件压缩后写入，如果仍不能满足需求，需要通过脚本或第三方工具（例如logrotate）进行切割压缩。如果切割压缩后文件仍然过大，可以将割接和压缩过的日志文件转储到其它地方。使用脚本切割并压缩方法如下：
+创建shell脚本nginx_log_rotate.sh
+#!/bin/bash
+logs_path="/var/log/nginx/"
+mv ${logs_path}access.log ${logs_path}access_$(date -d "yesterday" +"%Y%m%d").log
+kill -USR1 `cat /var/log/nginx/nginx.pid`
+sleep 1
+gzip ${logs_path}access_$(date -d "yesterday" +"%Y%m%d").log
+rm ${logs_path}access_$(date -d "yesterday" +"%Y%m%d").log
+
+备注：如果想每天定时进行切割压缩，可以将该脚本放入crontab中执行，如下：
+vim /etc/crontab
+0 0 * * * root /bin/sh /etc/nginx/nginx_log_rotate.sh
+
+建议2.5.1： 记录客户端IP
+说明：用户IP往往被使用在跟安全有关的场景上，例如日志审计，检查用户登录地区，基于IP 做访问频率控制等等。这种场景下，确保IP无法构造更重要。对于部署了Nginx这样反向代理的应用，在正确配置了Set Header行为后，可以记录真实IP和所有经过的代理的IP。
+首先，如果用户真的是通过代理访问Nginx，X-Forwarded-For最后一节以及X-Real-IP得到的是代理的IP，安全相关的场景只能用这个，但有些场景如根据IP显示所在地天气，就需要尽可能获得用户真实IP，这时候X-Forwarded-For中第一个IP就可以排上用场了。 
+举个例子：
+curl http://t1.imququ.com/ -H 'X-Forwarded-For: unknown, <>"1.1.1.1'
+remoteAddress: 127.0.0.1
+x-forwarded-for: unknown, <>"1.1.1.1, 114.248.238.236
+x-real-ip: 114.248.238.236
+X-Forwarded-For最后一节是 Nginx 追加上去的，但之前部分都来自于Nginx收到的请求头，这部分用户输入内容完全不可信。使用时需要做好输入校验，符合IP格式才能使用，不然容易引发SQL注入或XSS等安全漏洞。
+推荐配置：
+proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+2.6	HTTP安全响应消息头配置
+现代浏览器提供了一些安全相关的响应头，使用这些响应头一般只需要修改服务器配置即可，不需要修改程序代码，成本很低。Nginx作为Web服务器或提供Web页面服务时，增加如下配置，可以有效的提高Web安全性。需要注意的是，以下这些响应头只有部分现代浏览器才支持，所以并不是说加上他们，网站就可以不管web安全，万事大吉了。
+建议 2.6.1： 启用XSS保护
+说明：X-XSS-Protection这个响应头是用来防范XSS的。现在主流浏览器都支持，并且默认都开启了XSS保护，用这个header可以关闭它。它有几种配置：
+•0：禁用XSS保护；
+•1：启用XSS保护；
+•1; mode=block：启用XSS保护，并在检查到XSS攻击时，停止渲染页面（例如IE8中，检查到攻击时，整个页面会被一个#替换）；
+浏览器提供的XSS保护机制并不完美，但是开启后仍然可以提升攻击难度，总之没有特别的理由，不要关闭它。
+推荐配置：
+add_header X-XSS-Protection "1; mode=block";
+Nginx作为Web服务器或提供Web页面服务时，应该配置此项。
+
+建议 2.6.2：减少点击劫持
+说明：X-Frame-Options这个功能主要为了减少了点击劫持（Clickjacking）的发生。X-Frame-Options，已经转正为Frame-Options，但现阶段使用最好还是带上X-。Chrome4+、Firefox3.6.9+、IE8+均支持，详细的浏览器支持情况在这里: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options?redirectlocale=en-US&redirectslug=The_X-FRAME-OPTIONS_response_header#Browser_compatibility
+这个响应头支持三种配置：
+•DENY：不允许被任何页面嵌入；
+•SAMEORIGIN：不允许被本域以外的页面嵌入；
+•ALLOW-FROM uri：不允许被指定的域名以外的页面嵌入（Chrome现阶段不支持）；
+如果某页面被不被允许的页面以<iframe>或<frame>的形式嵌入，IE会显示类似于“此内容无法在框架中显示”的提示信息，Chrome和Firefox都会在控制台打印信息。由于嵌入的页面不会加载，这就减少了点击劫持（Clickjacking）的发生。
+推荐配置：
+add_header X-frame-options SAMEORIGIN;
+Nginx作为Web服务器或提供Web页面服务时，应该配置此项。
+
+建议 2.6.3：禁用浏览器的类型猜测
+说明：互联网上的资源有各种类型，通常浏览器会根据响应头的Content-Type字段来分辨它们的类型。例如："text/html"代表html文档，"image/png"是PNG图片，"text/css"是CSS样式文档。然而，有些资源的Content-Type是错的或者未定义。这时，某些浏览器会启用MIME-sniffing来猜测该资源的类型，解析内容并执行。
+例如，我们即使给一个html文档指定Content-Type为"text/plain"，在IE8-中这个文档依然会被当做html来解析。利用浏览器的这个特性，攻击者甚至可以让原本应该解析为图片的请求被解析为JavaScript。通过X-Content-Type-Options这个响应头可以禁用浏览器的类型猜测行为：
+这个响应头的值只能是nosniff，可用于IE8+和Chrome。另外，它还被Chrome用于扩展下载。
+推荐配置：
+add_header X-Content-Type-Options  nosniff;
+Nginx作为Web服务器或提供Web页面服务时，应该配置此项。
+
+建议2.6.4：降低CSRF攻击风险
+说明： 设置Nginx Referer模块，可以防御部分CSRF攻击。CSRF（Cross-site request forgery），中文名称：跨站请求伪造，攻击者盗用了你的身份，以你的名义发送恶意请求。CSRF能够做的事情包括：以你名义发送邮件，发消息，盗取你的账号，甚至于购买商品，虚拟货币转账。造成的问题包括：个人隐私泄露以及财产安全。
+配置样例：
+location /photos/ {	
+valid_referers none blocked www.mydomain.com *.mydomain.com; 
+			if ($invalid_referer) { 
+	return   403; 
+			} 
+
+2.7	Nginx SSL配置
+规则2.7.1：启用SSL功能
+实施指导：
+server {
+…
+ssl on;
+ssl_certificate /usr/local/nginx/conf/server.crt;
+ssl_certificate_key /usr/local/nginx/conf/server.key;
+…
+}
+注意：启用SSL功能后需要配置证书和私钥，私钥不强制要求设置密码保护，但需要对私钥文件进行严格的访问控制。必须做到以下两点：
+1）	私钥设置严格的访问权限，只允许进程运行用户可以读；
+2）	如果要对私钥进行备份或转移，必须设置密码保护。
+
+规则2.7.2：设置合适的超时时间
+说明：设置ssl timeout的原因是避免攻击者建立大量无效链接，或者慢速攻击。
+推荐配置：
+server {
+…
+ssl_session_timeout  	5m;  #超时时间5分钟
+…
+}
+
+规则2.7.3：使用安全的TLS协议
+说明：如果不配置ssl_protocols，Nginx默认使用SSLv3 TLSv1 TLSv1.1 TLSv1.2。根据密码算法应用规范的要求，我们应该使用更安全的TLS协议。Nginx需要openssl版本>=1.0.1来支持TLSv1.2协议。符合密码算法应用规范的兼容场景条件下可以支持TLSv1.0。
+实施指导：
+server {
+…
+ssl_protocols  TLSv1.1 TLSv1.2;
+…
+}
+
+规则2.7.4：使用安全的加密套件
+说明：ssl_ciphers定义了网站使用那些加密套件，nginx的默认设置是HIGH:!aNULL:!MD5;这个值已经是比较安全的。最主要的是ssl_prefer_server_ciphers的设置，开启这个设置可以优先使用服务器定义的加密算法以防止Beast Attacks。
+推荐配置：
+server {
+…
+ssl_ciphers
+"ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:AES256-GCM-SHA384:AES128-GCM-SHA256:AES256-SHA256:AES256-SHA:HIGH:!MEDIUM:!LOW:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!PSK:!RC4:@STRENGTH"; 
+#启用的加密算法，见下 
+		# -MEDIUM：		排除中等加密强度的算法组合
+		# -LOW：			排除低加密强度的加密算法组合
+		# -EXPORT：			排除出口级别强度的加密算法组合
+		# -aNULL：			排除不做身份验证的加密算法组合
+		# -eNULL：			排除不做加密的加密算法组合
+		# @STRENGTH：		按加密强度排序
+
+ssl_prefer_server_ciphers   on; #协商时优先使用服务器指定的加密算法
+…
+}
+
+规则2.7.5：使用2048位的DHE Parameters
+说明：如果没有定义ssl_dhparam的话，Nginx默认使用openssl随机生成的1024位。如果SSL/TLS中有使用到DH算法，需要使用openssl生产2048位的DH参数（ openssl gendh -out dh2048.pem 2048），并设置Nginx的ssl_dhparam参数。
+推荐配置：
+server {
+…
+ssl_dhparam conf.d/cert/dh2048.pem;
+…
+}
+
+建议2.7.1：设置SSL会话缓存
+说明：设置SSL会话缓存，将可以使客户端在一定时间内复用这个SSL会话而不需要重新进行TLS握手建立SSL会话，并且也可以减少服务器资源的占用。使用ssl_session_cache，据Nginx官方手册介绍每1M缓存可以存储4000个会话。这个设置在流量大的HTTPS网站可以有显著效果，提升服务器处理SSL并发连接的能力。
+推荐配置：
+server {
+…
+ssl_session_cache shared:SSL:10m; #使用10M共享内存
+ssl_session_timeout 10m; #设置会话过期时间为10分钟
+…
+}
+
+建议2.7.2：开启HSTS
+说明：HSTS(HTTP Strict Transport Security)强制安全传输技术是一种网站安全机制，它会让浏览器强制使用HTTPS来请求网站资源，用以防止一些恶意行为。具体请参见RFC6797。而开启HSTS只需要添加一个header就可以。
+推荐配置：
+server {
+…
+add_header Strict-Transport-Security "max-age=31536000"; #365天内使用HTTPS访问站
+…
+}
+
+建议2.7.3：设置OCSP stapling
+说明：OCSP(Online Certificate Status Protocol)在线证书状态协议，用来验证网站证书有效性。使用OCSP可以加快HTTPS链接的建立、减少客户端带宽使用，因为OCSP克服了证书注销列表(CRL)的主要缺陷：必须经常在客户端下载以确保列表的更新。浏览器只需要向证书提供的OSCP服务器发送1个请求就可以验证证书状态而不需要下载整个CRL。
+如果ssl_certificate中没有包含中级证书，我们就必须设置ssl_trusted_certificate，里面包含PEM格式的CA根证书和中级证书。比如本站的SSL证书是AlphaSSL证书，而AlphaSSL是GlobalSign这个CA签发的中级证书。
+推荐配置：
+server {
+…
+ssl_stapling on; 
+ssl_stapling_verify on; 
+ssl_trusted_certificate conf.d/cert/AlphaSSLroot.crt; #
+resolver 8.8.8.8; #添加resolver解析OSCP响应服务器的主机名
+…
+}
+
+2.8	已知安全防护
+建议2.8.1：防止CC攻击
+说明：HttpLimitReqModul用来限制连单位时间内连接数的模块，使用limit_req_zone和limit_req指令配合使用来达到限制。一旦并发连接超过指定数量，就会返回503错误。那么，利用CC攻击机器或者利用代理等方法对web服务器发起大量请求的低端CC攻击是可以防护的。但是，会带来一定的误杀概率，例如，当实现多个用户使用一个IP的内网化场景，对单个IP的访问限制是会出现误杀的。
+实施指导：
+   # $binary_remote_addr是客户端地址，zone=one:10m表示一个名为one的#limit_req_zone用来存储session的，大小内存是10M
+   # rate=10r/s限制每秒平均请求为10
+http {
+    … ...
+limit_req_zone $binary_remote_addr zone=one:10m rate=30r/s;
+… …
+server {
+… …
+#burst=3,即漏桶数是3，当限制每个IP的每秒请求不超过10次时，如果第1秒、第2秒请
+#求9次，那么第3秒请求12次是允许的。
+        limit_req   zone=one  burst=5;
+… …
+    }
+}
+备注：以上的具体参数值设置，仅供参考，还需根据实际业务场景设置参数值。
+
+建议2.8.2：防止盗链
+说明：如果不是专门为第三方网站提供图片等资源的应用，都应用使用防盗链措施防止其它网站使用自己网站的资源，保护自己的资源版权。Nginx有很好的防盗链手段，哪怕Nginx只是作反向代理，资源部署在另外的主机，也可以使用Nginx防盗链。
+可以参考下面的例子修改nginx.conf进行防盗链，注意根据实际场景修改图片资源路径和格式和valid_referers中的内容。这样配置后只允许valid_referers列表中的站点可以访问当前站点的图片，如果来源域名不在这个列表中，那么$invalid_referer等于1。
+实施指导 
+location ~* \.(gif|png|bmp|jpe?g)$ {
+  expires 7d;
+  add_header Pragma public;
+  add_header Cache-Control "public, must-revalidate, proxy-revalidate";
+
+  # prevent hotlink
+  valid_referers none blocked ~.google. ~.bing. ~.yahoo. server_names ~($host);
+
+  if ($invalid_referer) {
+    rewrite (.*) /static/images/hotlink-denied.jpg redirect;
+    # drop the 'redirect' flag for redirect without URL change (internal rewrite)
+  }
+}
+
+# stop hotlink loop
+location = /static/images/hotlink-denied.jpg { }
+
+3	参考链接
+1.	Nginx官方安全报告网址：http://Nginx.org/en/security_advisories.html
+2.	Nginx官方下载网址：http://Nginx.org/en/download.html
+
+
+
