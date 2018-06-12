@@ -54,6 +54,676 @@
     规则2.6.1：防护UTF-8导致的目录跨越漏洞。	44
     
     
-    
+  2.1	版本部署运行的策略
+  规则2.1.1：及时更新补丁或升级系统，使用本系列最新最稳定的安全版本。
+      说明：系统的最原始攻击来自其本身的漏洞，因此一定要做好其漏洞的防护。搜索Tomcat最新最稳定的安全版本和安全补丁，下载并安装。（该规则主要针对发布版本，至于现网正在运行的版本，由产品酌情把握。）
+      实施指导：
+      下载最新最稳定的版本（以下提供的均为官方网址）
+      1．	在http://tomcat.apache.org/whichversion.html上，查看Servlet和JSP规范对应的Tomcat版本，以及各版本的详细说明，以方便选择最合适的版本。
+      2．	在http://tomcat.apache.org/download-**.cgi上下载最新最稳定的安全版本。目前仅推荐7.X和8.0系列的版本，即将网址中的**符号替换成70或者80。其他系列的版本已经归档，并且不再能得到支持。
+      补丁：
+      在安全报告http://tomcat.apache.org/security.html上，查找产品当前使用的版本所存在的安全漏洞，并根据安全报告中漏洞的威胁级别，以及产品本身的应用场景，选择下载补丁还是升级系统。
+      备注：一般不建议直接打补丁，建议升级到当前系列已被评估过的最新最稳定的安全版本。
+
+
+  规则2.1.2：用于运行Tomcat的用户必须是一个没有特权的用户：既无权访问非必须的文件，又不能执行非必须的程序。
+      说明：缺省情况下，Java运行时根据运行它的用户授予安全权限。当Tomcat以系统管理员身份或作为系统服务运行时，Java运行时取得了系统用户或系统管理员所具有的全部权限。这样一来，Java运行时就取得了所有文件夹中所有文件的全部权限。并且Servlets(JSP在运行过程中要转换成Servlets)取得了同样的权限。所以Java代码可以调用Java SDK中的文件API列出文件夹中的全部文件，删除任何文件，最大的危险在于以系统权限运行一个程序。
+      实施指导：
+      Window环境：
+      1．	通过控制面板->用户帐户->管理用户帐户，新建普通用户tomcatuser，确定新用户tomcatuser不属于管理员组。
+      2．	设置权限：为tomcatuser用户添加Tomcat安装目录的读、写、执行的权限；为tomcatuser用户添加应用程序（例如webapps）目录的只读权限；如果某些应用程序需要写权限，请单独为其配置tomcatuser的写权限。
+      3．	打开“控制面板→管理工具→服务”，在本地服务中找到“Apache Tomcat”，打开其属性，在“登录”页签中配置帐户为tomcatuser。
+      4．	以tomcatuser用户重新登录后启动Tomcat服务器，或者在DOS窗口以RUNAS命令启用tomcatuser帐号，打开Tomcat服务。
+      5．	下载zip直接解压的方式，以普通用户tomcatuser登录系统后解压zip包运行Tomcat即可
+      Linux环境：
+      当安装账户为超级管理员时：
+      1．	专门为Tomcat建立一个单独的用户和用户组。
+      # groupadd tomcatgroup
+      # useradd -g tomcatgroup -d /home/tomcat -m tomcatuser 
+      为用户设置密码：
+      passwd tomcatuser
+      此处系统会提示你输入新密码，请自行输入。密码要符合强口令要求（密码至少8位长，至少包含大写字母、小写字母、数字和特殊字符中的两种）。
+      注：tomcatgroup 和 tomcatuser 为组名和用户名，用户可根据需要自行修改。/home/tomcat 为用户登录时默认路径（家目录），用户可根据需要自行修改。
+      2．	设置权限：更改Tomcat安装目录属主为tomcatuser用户；为tomcatuser用户添加应用程序（例如webapps，或者被单独放置在tomcat安装目录之外的应用目录）目录的只读权限；如果某些应用程序需要写权限，请单独为其配置tomcatuser的写权限。
+      3．	以tomcatuser用户登录后启动Tomcat服务器。
+      当安装帐户为普通用户时：
+      1．	在安装之前就建立一个单独的用户和用户组：
+      # groupadd tomcatgroup
+      # useradd –g tomcatgroup tomcatuser –p tomcatuser
+      2.使用新建立的tomcatuser安装Tomcat之后，不要再使用tomcatuser用户启动运行或安装其他程序；如果产品的web应用被放置在Tomcat安装目录之外，请为tomcatuser添加该目录的只读权限；如果某些应用程序需要写权限，请单独为其配置tomcatuser的写权限。
+
+  规则2.1.3：删除Tomcat默认管理控制台或管理员帐户。
+      说明：默认情况下，Tomcat存在管理控制台，其地址一般为http://[IP]:[Port]/admin。管理台的应用文件，在$tomcat\ webapps下，有host-manager和manager两个应用。其用户密码，在$tomcat\conf/tomcat-users.xml中定义。默认情况下， tomcat管理台启用，易造成严重安全问题。
+      实施指导：
+      方法一：本方法适用于完全不需要使用默认控制台及相关功能的应用场景。
+      1．	删除$tomcat\webapps下Host-manager和manager两个应用；
+      2．	删掉$tomcat\conf\tomcat-users.xml中的用户和密码；3．	
+      方法二：本方法适用于需要保留默认控制台和相关程序的应用场景。
+      1．	重命名管理控制台
+      重命名$tomcat\webapps\manager目录
+      # mv $tomcat/webapps/manager $tomcat /webapps/new-name  //new-name应根据实际需要命名
+      在$tomcat\conf\Catalina\localhost\目录下创建new-name.xml（可复制默认Context.xml,并改名为new-name.xml）,在此文件中新增（修改）Context标签，指定新的docBase，增加IP限制，限制只能有内网特定IP或IP端才能访问控制台：
+          <Context docBase="${catalina.home}/webapps/new-name"
+              privileged="true" antiResourceLocking="false" antiJARLocking="false">
+      <Valve className="org.apache.catalina.valves.RemoteHostValve" allow=”10.70.107.*” />
+      </Context>
+      备注：蓝色内容必须根据实际情况修改，RemoteAddrValve过滤的是IP地址，多个ip或多个域名之间，可以使用“,”分隔。
+      2．	配置$tomcat\conf\tomcat-users.xml中的用户名和密文的密码（用$tomcat\bin目录下的digest.sh对密码进行摘要，得到密文，例如：digest.sh -a sha Ryoukk_195，其中蓝色的密码自行设置，保证密码长度大于8位，包含大小写字符、数字和特殊字符）。在$tomcat\conf\server.xml中的UserDataBase-Realm指定密码的摘要算法（新增蓝色部分）：<Realm className="org.apache.catalina.realm.UserDatabaseRealm" digest="sha" resourceName="UserDatabase"/>
+      3．	当tomcat已经配置了SSL（参考：规则2.2.22章节”），则对登录管理应用强制使用SSL，配置方法如下：
+      在$tomcat\webapps\manager\WEB-INF\web.xml的security-constraint标签内，增加如下内容：
+      <web-resource-collection>
+          <web-resource-name>SSL</web-resource-name>
+          <url-pattern>/manager/*</url-pattern>
+      </web-resource-collection>
+      <user-data-constraint>
+          <transport-guarantee>CONFIDENTIAL</transport-guarantee>
+      </user-data-constraint>
+      备注：当Tomcat启用SSL时，需注意防范POODLE漏洞，在配置HTTPS connector时设置sslProtocol=" TLSv1.1, TLSv1.2"（6.0.38之前版本）或sslEnabledProtocols = " TLSv1.1,TLSv1.2"（6.0.38及以后版本）
+
+  规则2.1.4：删除安装过程文件、缺省安装的管理帮助文件及用户测试类的非必需文件。
+      说明：默认的示例或测试应用容易被远程访问或执行，给系统带来相当的危害。
+      实施指导：
+      1．	删除安装过程文件：                      //安装后删除
+         apache-tomcat-6.0.20.*                      //以6.0.20版本为例
+      2．	删除非必需的管理应用和帮助应用：
+      $tomcat\webapps\*             //删除webapps目录下产品应用自身和ROOT以外的目录和文件（保留ROOT目录及其文件，以便存放出错提示页面）。
+      Tomcat6之前的版本的版本还需要删除以下目录：
+      $tomcat\server\webapps\*                   
+      3．	删除系统示例程序和网页：
+      $tomcat\examples                         //安装时可以选择不安装这部分
+      4．	删除用户测试类的非必需文件。
+
+  规则2.1.5：禁用应用程序自动部署功能。
+      说明：默认情况下，tomcat启动时，会自动部署$appBase下面的所有应用。例如，当$appBase
+      的值为webapps时，那么任意一个应用，只要被放进webapps目录下，在tomcat启动时，都会被发布。这有可能导致恶意或者未经测试的应用程序被自动部署在服务器上。因此，这里必须禁用掉Tomcat的自动部署功能。
+      实施指导：
+      修改配置文件$tomcat/conf/server.xml如下：
+      autoDeploy="false"              //自动部署
+      deployOnStartup="false"         //在启动时自动部署
+      备注：
+      1.	如果server.xml文件中不存在deployOnStartup参数，则必须手工添加，因为该参数的默认值是true。格式位置如下：
+      <Host …. deployOnStartup="false"/>
+      2.	关闭自动部署功能后，Tomcat不会自动发布$appBase目录下的web应用。对需要发布的Web应用，需要手工部署。手工部署的推荐方法，是在server.xml文件的Host标签内新建一个context，格式如下：
+      <Context path="/myapp" reloadable="false" docBase="myapp" workDir="webapps/myapp/WEB-INF/work"/>
+      备注：
+      path：指定访问该Web应用的URL入口。
+      docBase：指定Web应用的文件路径，可以给定绝对路径，也可以给定相对于<Host>的appBase属性的相对路径。
+      workDir：是指Tomcat解析Jsp转换为Java文件，并编译为class存放的文件夹，设置在项目文件夹里面，可以避免移植到其他地方首次读取jsp文件需要重新解析。可以给定绝对路径，也可以给定相对于tomcat根目录的相对路径。禁止将workDir设置为Web内容目录（通过Web可以直接浏览、访问的目录），否则容易被攻击者直接下载获取。也可以不配置workDir属性，使用默认配置。
+      reloadable：设置为false，只在启动时加载该Web应用WEB-INF的lib和classes。
+
+      备注：
+      1、如果产品应用的context已经在META-INF/context.xml文件配置的话，有两种处理办法:
+      （1）修改conf/server.xml文件中的deployOnStartup属性的值为"true"，且保证/conf/server.xml中没有配置此应用的context；
+      （2）无需修改deployOnStartup参数配置，将META-INF/context.xml里面的参数配置移到如上新建的context上，并删除META-INF/context.xml，因为此文件已无效。
+      2、所有涉及到<Context/>标签的规则,不仅仅要检查context.xml里面的<Context/>标签，serverl.xml里面的也要检查。
+
+  建议2.1.1：以安全管理模式运行Tomcat
+      说明：通过使用安全管理器运行Tomcat，应用程序将在沙箱中运行，可以防止不受信任的代码访问文件系统上的文件或者执行敏感的操作。
+      Tomcat以安全管理模式运行时，安全管理器自动加载默认的安全策略文件$CATALINA_HOME /conf/catalina.policy。
+       默认的安全配置Catalina.policy文件包含了一组默认的安全策略，对Tomcat中的web应用程序对系统环境变量读取和敏感操作等进行授权。产品可以根据代码需要增加授权（可以使用JDK的policytool工具进行策略编辑,添加自己的策略授权）。
+      在安全管理模式下，应用程序中代码若进行了非授权的操作，程序则会抛出异常。产品可以根据这些异常信息，对安全策略进行补充。
+
+      安全策略文件可以定制如下的权限管理（概要）：
+      java.security.AllPermission  所有权限的集合
+      java.util.PropertyPermission  系统/环境属性权限
+      java.lang.RuntimePermission  运行时权限
+      java.net.SocketPermission   Socket权限
+      java.io.FilePermission  文件权限,包括读写,删除,执行
+      java.lang.reflect.ReflectPermission  反射权限
+      java.net.NetPermission   网络权限
+      java.security.SecurityPermission   安全控制方面的权限
+      。。。
+      Policy文件配置内容细节请查阅：
+      http://tomcat.apache.org/tomcat-7.0-doc/security-manager-howto.html
+      http://docs.oracle.com/javase/7/docs/technotes/guides/security/permissions.html
+      实施指导：
+      启动Tomcat时，使用-security参数：
+      $CATALINA_HOME/bin/catalina.sh start -security       (Unix)
+      C:\> %CATALINA_HOME%\bin\catalina start -security     (Windows)   
+
+      备注：
+      产品应该根据应用程序的权限需求，对策略文件catalina.policy进行扩展；
+
+  建议2.1.2 不使用不安全的Realms
+      说明：Tomcat提供多种Realm来保存Web应用程序认证用户所使用的账号密码。若产品需要使用Realm配置，要避免使用JDBCRealm、UserDatabaseRealm、JAASRealm和MemoryRealm。原因如下：
+      MemoryRealm从tomcat-userx.xml中加载数据，数据变化时，需要重启Tomcat，不适用产品；
+      JDBCRealm在用户认证鉴权时总是使用单线程工作，不适用产品；建议使用DataSourceRealm；
+      JAASRealm使用较少，相对其他Realm，代码较不成熟；
+      UserDatabaseRealm不适合大规模系统，只适合小型系统（若少量用户认证场景，可以使用此Realm）。
+      实施指导：
+      执行下面的语句检查不安全的Realm是否被使用：
+      # grep "Realm className" $CATALINA_HOME/conf/server.xml | grep MemoryRealm 
+      # grep "Realm className" $CATALINA_HOME/conf/server.xml | grep JDBCRealm 
+      # grep "Realm className" $CATALINA_HOME/conf/server.xml | grep UserDatabaseRealm 
+      # grep "Realm className" $CATALINA_HOME/conf/server.xml | grep JAASRealm
+
+
+  建议2.1.3 使用LockOut Realms
+      说明：若产品需要使用Realm配置，可以使用LockOut Realm对用户认证功能进行加固。如果用户多次登录失败，LockOut Realm在标准Realm的基础上提供了锁定用户的能力。
+       实施指导：
+      在Tomcat已经配置Realm的情况下，增加LockOut Realm的配置：
+      <Realm className="org.apache.catalina.realm.LockOutRealm" failureCount="3" lockOutTime="600" cacheSize="1000" cacheRemovalWarningTime="3600">
+       <Realm className="org.apache.catalina.realm.DataSourceRealm" dataSourceName=... />
+       </Realm>
+      备注: 产品不使用Realm时,无需加固此项配置。
+
+  建议2.1.4：部署应用时，设定logEffectiveWebXml属性和metadata-complete属性
+      说明：Tomcat在启动应用程序时，会读取web.xml的配置、扫描class文件中的注释（@WebServlet、@WebListener、@WebFilter…）以及读取web-fragment.xml配置来合并生成最终的web.xml，启动相关的组件。通过在应用程序的context.xml设定logEffectiveWebXml为true，Tomcat可以在日志中打印实际有效的web.xml信息，用户可以确认Web.xml中的配置符合实际需求。另外在应用程序的web.xml中设定 metadata-complete属性为true，可以保证Tomcat在部署应用程序时，只使用web.xml的配置，忽略其他的配置（class中的注释、web-fragment.xml）。
+      设定logEffectiveWebXml为true可以支持用户回溯应用程序部署时实际有效的web.xml配置；设定metadata-complete为true可以确保应用程序只使用web.xml中的配置，降低安全风险。
+      实施指导：
+      检查每个应用程序的web.xml，确认metadata-complete属性设定为true：
+      位置：$CATALINA_BASE\webapps\<app name>\WEB-INF\web.xml 
+      <web-app 
+      ...
+      metadata-complete="true"
+       ...
+       >
+      检查每个应用程序的context.xml，确认logEffectiveWebXml属性设定为true：
+      位置：$CATALINA_BASE\webapps\<app name>
+      \META-INF\context.xml 
+      <Context 
+      ...
+      logEffectiveWebXml="true"
+       ...
+       >
+       备注： 设定metadata-complete为true时，并不会禁用所有的注释扫描，比如：使用了ServletContainnerInitializer和@HandlesTypes注释。
+
+
+  建议2.1.5：启动Tomcat时，设定STRICT_SERVLET_COMPLIANCE属性
+      说明：Tomcat在启动时，设定STRICT_SERVLET_COMPLIANCE参数为true，Tomcat在处理请求时会严格遵从Servet规范。比如：Tomcat回应request时总是会发送Http Content-type头，这样可以防止各种Web浏览器在缺失Content-type头信息的场景下的行为不一致。
+      设定STRICT_SERVLET_COMPLIANCE参数为true后，Tomcat的一些默认属性值会随之调整，主要变化如下:
+      •	org.apache.catalina.core.ApplicationContext.GET_RESOURCE_REQUIRE_SLASH
+      •	org.apache.catalina.core.ApplicationDispatcher.WRAP_SAME_OBJECT
+      •	org.apache.catalina.core.StandardHostValve.ACCESS_SESSION
+      •	org.apache.catalina.session.StandardSession.ACTIVITY_CHECK
+      •	org.apache.catalina.session.StandardSession.LAST_ACCESS_AT_START
+      •	org.apache.tomcat.util.http.ServerCookie.ALWAYS_ADD_EXPIRES
+      •	org.apache.tomcat.util.http.ServerCookie.FWD_SLASH_IS_SEPARATOR
+      •	org.apache.tomcat.util.http.ServerCookie.PRESERVE_COOKIE_HEADER
+      •	org.apache.tomcat.util.http.ServerCookie.STRICT_NAMING
+      •	The resourceOnlyServlets attribute of any Context element.
+      •	The tldValidation attribute of any Context element.
+      •	The useRelativeRedirects attribute of any Context element.
+      •	The xmlNamespaceAware attribute of any Context element.
+      •	The xmlValidation attribute of any Context element.
+      各属性内容的调整请参考url: http://tomcat.apache.org/tomcat-7.0-doc/config/systemprops.html 
+      http://tomcat.apache.org/tomcat-7.0-doc/config/context.html
+      实施指导：
+      在启动Tomcat的脚本中增加属性设定：
+      -Dorg.apache.catalina.STRICT_SERVLET_COMPLIANCE=true
+      （linux）修改$tomcat/bin/catalina.sh文件，在文件中启动tomcat的命令前增加配置：
+      CATALINA_OPTS="$CATALINA_OPTS -Dorg.apache.catalina.STRICT_SERVLET_COMPLIANCE=true"
+      （window）修改$tomcat/bin/catalina.bat文件，在文件中启动tomcat的命令前增加配置：
+      set CATALINA_OPTS=%CATALINA_OPTS% -Dorg.apache.catalina.STRICT_SERVLET_COMPLIANCE=true
+
+
+
+  2.2	基本配置的安全策略
+  规则2.2.1：禁用不必要的http方法：DELETE、PUT、TRACE、HEAD、OPTIONS等。
+      说明：Tomcat服务器提供默认http方法包括GET、HEAD、POST、PUT、DELETE、OPTIONS。在这些方法中，PUT、DELETE方法很少被使用到，并且极易被利用来进行攻击。
+      实施指导：
+      1．	禁用DELETE和PUT的方法：
+      在$tomcat/conf/web.xml检查readonly参数的值是否为true：
+      <init-param> 
+           <param-name>readonly</param-name> 
+           <param-value>true</param-value> 
+      </init-param> 
+      备注：如果不存在readonly参数，则不用配置，因为该参数的默认值为true；如果配置了该参数，则需要确保参数值为true。该配置不会影响到RESTFUL中的PUT、DELETE方法的使用，因为RESTFUL的PUT、DELETE方法只是构造请求，并不会实际在服务上创建或者删除文件。
+      2．	禁用Trace的方法：
+      在$tomcat/conf/server.xml禁用trace方法，即配置allowTrace为false：
+      <Connector port="80" maxThreads="150" connectionTimeout="20000" redirectPort="8443" allowTrace="false"/>
+      备注：如果不存在allowTrace参数，则不用配置，因为该参数的默认值为false；如果配置了该参数，需要确保参数值为false。
+      3．在$tomcat/conf/web.xml文件的<web-app>节中增加以下内容：
+       <security-constraint>
+          <web-resource-collection>
+            <url-pattern>/*</url-pattern>
+            <http-method>OPTIONS</http-method>
+            <http-method>HEAD</http-method>
+            <http-method>PUT</http-method>
+            <http-method>DELETE</http-method>
+            <http-method>TRACE</http-method>
+          </web-resource-collection>
+          <auth-constraint>
+          </auth-constraint>
+       </security-constraint>
+      说明:
+      1、这里的<url-pattern>/*</url-pattern>和策略可以根据实际业务来进行配置.
+      2、这里的配置不会影响到RESTFUL中PUT、DELETE方法的使用，因为RESTFUL的PUT、DELETE方法只是构造请求，并不会实际在服务器上创建或删除文件。如果产品由于使用RESTFUL接口需要PUT、DELETE方法，应该把PUT和DELETE方法从上面配置的黑名单中删除。
+
+  规则2.2.2：禁用webdav。
+      说明：WebDAV（Web-based Distributed Authoring and Versioning）是基于 HTTP 1.1 的一个通信协议。它为 HTTP 1.1 添加了一些扩展（就是在 GET、POST、HEAD 等几个 HTTP 标准方法以外添加了一些新的方法），使得应用程序可以直接将文件写到 Web Server 上，并且在写文件时候可以对文件加锁，写完后对文件解锁，还可以支持对文件所做的版本控制。这存在一定的安全问题。Tomcat本身是支持WebDAV的，虽然需要进行配置才可以启用。
+      实施指导：
+      在配置文件$tomcat/conf/web.xml中，确保下面的配置节点不存在或者处于注释状态：
+      <servlet>
+      <servlet-name>webdav</servlet-name>
+      <servlet-class>org.apache.catalina.servlets.WebdavServlet</servlet-class>
+      ...
+
+  规则2.2.3：禁用Symbolic links。
+      说明：Symbolic links是用来解决不同的web应用程序之间共享文件的一种方式。这会造成应用之间的相互影响，一个应用的安全漏洞，有可能影响到所有关联的应用，因此，这种方式在安全方面存在极大隐患。
+      实施指导：
+      1．	在配置文件$tomcat/conf/server.xml中，确保每个context节点都没有allowLinking属性
+      2．	在配置文件$tomcat/conf/context.xml中，确保每个context节点都没有allowLinking属性
+      3．	在每个web应用的WEB-INF下检查是否存在context.xml文件，如果存在，请检查并确保每个context节点都没有allowLinking属性
+
+  规则2.2.4：定制Tomcat出错信息。
+      说明：Tomcat发生服务器端出错时（例如：Tomcat在找不到网页时，会报404错误），错误页面上会附带当前服务器版本号，还可能泄露其他服务器端信息。黑客可以通过版本号，查询当前Tomcat服务器的默认配置信息，以及该版本的安全漏洞。
+      实施指导：
+      在配置文件$tomcat/conf/web.xml的倒数第二行（即</web-app>之前的那一行）添加如下内容：
+      <error-page> 
+       <error-code>400</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>401</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>402</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>403</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>404</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>405</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>406</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>407</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>413</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>414</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>500</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page> 
+       <error-code>501</error-code>
+       <location>/error.htm</location> 
+      </error-page>
+      <error-page>
+      <exception-type>java.lang.Throwable</exception-type>
+      <location>/error.htm</location>
+      </error-page>
+      备注：
+      error.htm文件要拷贝到各web应用的根目录，可以在error.htm文件中自定义出错提示信息，error.htm的大小必须大于512个字节，否则IE会自动调用自己的友好提示界面。特别提醒，禁止给响应码302配置错误页面，否则所有重定向都将指向该错误页面。<location>的配置值是自定义错误页面相对于当前Web应用的根目录的路径，需要根据自定义错误页面的实际路径配置。
+      使用Eclipse集成Tomcat后，如果指定了错误页面，会看不到异常抛出，无法定位错误。可以在开发阶段先注释掉此段，在发布时再取消注释。
+
+  规则2.2.5：关闭Tomcat的目录列表功能。
+      说明：缺省情况下，访问tomcat下的一个web应用，如果输入是一个目录名，而且该目录下没有一个可用的welcome文件，那么tomcat会将该目录下的所有文件列出来，这种敏感信息泄露是严格禁止的。Tomcat5.0以后的版本出于安全考虑，默认的是关闭目录列表，但是为了程序调试方便，部分程序员也有可能开启这一功能。因此，要确认该项配置是否正确。
+      实施指导：
+      在配置文件$tomcat/conf/web.xml中修改listing参数的值为false：
+      <init-param>
+                  <param-name>listings</param-name>
+                  <param-value>false</param-value>
+              </init-param>
+
+  规则2.2.6：更改Tomcat服务器默认shutdown端口号和命令。
+      说明：Tomcat服务器提供默认shutdown端口（8005）和命令（SHUTDOWN），很容易被黑客捕获利用关闭服务器，进而威胁到服务器和应用等。
+      实施指导：
+      1、使用shutdown.sh关闭tomcat
+      2、修改$home/conf/server.xml文件，更改默认端口和shutdown命令为其他大于8位的任意字符串，例如：
+      <Server port="2324" shutdown="Rea!!yC0mplexW0rd">  //这里shutdown命令建议12个字符，包含大小写字母、数字和特殊字符
+      3、使用startup.sh启动tomcat
+      备注：默认的8005端口为Tomcat的shutdown端口，在linux下如果删掉或者改成-1（表示不使用shutdown端口），会导致Tomcat无法shutdown，故不建议禁用shutdown端口。必须在关闭tomcat的情况下修改该参数，否则会导致tomcat无法正常关闭。
+
+  建议2.2.1：修改tomcat默认端口8080和8443
+      <Connector port="8108" protocol="HTTP/1.1"       //默认端口8080
+      connectionTimeout="20000" 
+      redirectPort="6743" />           //默认端口8443
+
+      规则2.2.7：限制http请求的消息主体和消息头的大小。
+      说明：此指令给了服务器管理员更大的可控性，以控制客户端不正常的请求行为。
+      实施指导：
+      在配置文件$tomcat/conf/server.xml中的每个Connector的“maxPostSize”属性为10240，“maxHttpHeaderSize”属性为8192：
+          <Connector port="8080" protocol="HTTP/1.1" 
+                     connectionTimeout="20000" maxPostSize="10240" maxHttpHeaderSize=”8192”
+                     redirectPort="8443" />
+      备注：推荐请求体大小限制为10240bytes，消息头的大小限制为8192bytes，如果产品有特殊需求，可以进行相应调整。
+
+  规则2.2.8：禁止配置Tomcat的网络连接超时时间为0或-1。
+      说明：connectionTimeout为网络连接超时时间毫秒数，当配置为0或-1时，表示永不超时，在受到DOS攻击时，很快就会导致最大连接数被完全占用，进而导致Tomcat服务器无法访问。因此这里禁止配置connectionTimeout为0和-1，通常推荐的超时时间为20s和30s。特殊情况下，请根据具体性能需求进行调优。
+      实施指导：
+      在配置文件$tomcat/conf/server.xml中的每个Connector的“connectionTimeout”属性为20000：
+          <Connector port="8080" protocol="HTTP/1.1" 
+                     connectionTimeout="20000" maxPostSize="10240"
+                     redirectPort="8443" />
+      备注：如果产品有特殊性能需求，可以进行相应调整。
+      
+  规则2.2.9：配置Tomcat的会话超时时间为10分钟。
+      说明：Tomcat服务器提供的默认超时时间为30分钟，这个时间过长，除了导致空闲连接消耗的处理资源损失外，受攻击的时间窗也相应变长。
+      实施指导：
+      修改$tomcat下所有的web.xml配置文件如下：
+      <session-config>
+              <session-timeout>10</session-timeout>      //将30修改为10
+      </session-config>
+      备注：产品实际的会话超时时间根据自己的业务情况来设置一个默认值，建议为10分钟。
+
+  规则2.2.10：关闭会话facade回收重利用功能。
+      说明：RECYCLE_FACADES（会话facade回收重利用）指定是否为每个请求都建立一个新的facade，如果设置为false，则新请求可能不会创建新的facade而是使用旧的facade，该功能有可能导致请求信息泄露。
+      实施指导：
+      在启动脚本$tomcat/bin/catalina.sh中添加如下命令：
+      -Dorg.apache.catalina.connector.RECYCLE_FACADES=true
+      备注：该参数仅出现在Tomcat6.0及其之后的版本中，且默认值为false。
+
+  规则2.2.11：关闭crossContext功能。
+      说明：当crossContext设置为true时，系统允许ServletContext.getContext调度另一个应用程序，这使得crossContext有创造恶意应用的可能，因此必须限制该功能。
+      实施指导：
+      在所有的context.xml文件中，确认crossContext属性为false：
+      <Context ... crossContext= "false" />
+      备注：未在context.xml文件中发现该属性时可以不用添加，其默认值为false。
+
+  规则2.2.12：启用context.xml文件的useHttpOnly参数，防止会话cookie被客户端脚本访问。
+      说明：设置cookie为HttpOnly，可以阻止客户端脚本访问（包括读取和修改）cookie，当支持HttpOnly的客户端浏览器（当前主流的浏览器都支持）检测到Cookie包括了HttpOnly标志时，浏览器返回空字符串给企图读取该cookie的脚本，这样cookie中的任何信息暴露给黑客或者恶意网站的几率将会大大降低。早期需要通过服务端代码设置cookie的HttpOnly属性值为true，Tomcat在Tomcat 6.0.19和Tomcat 5.5.28的版本提供新的功能：只需要配置context.xml文件的useHttpOnly参数，即可实现对会话cookie设置HttpOnly属性，从而保护会话cookie不被客户端脚本访问。
+      在$tomcat/conf/context.xml中设置context的参数useHttpOnly的值为true，例如
+      <Context useHttpOnly="true">
+      备注：useHttpOnly参数适用于Tomcat 6.0.x的版本；Tomcat7不需要设置，因为Tomcat7默认设置useHttpOnly参数值为true。
+
+  规则2.2.13：不使用的Connector（Protocol）必须删除。
+      说明：对于不使用的Connector应该删除，否则会带来安全隐患。Tomcat默认情况下提供AJP 1.3 Connector，负责和其他的HTTP服务器建立连接（例如：Apache和Tomcat组合使用，客户请求通过Apache过滤转发到tomcat服务器，对于一些静态页面的请求，包括请求的Html文件，静态页面或者动态页面中的图片都直接由Apache处理，采用另外一种说法就是，对于用户发出的对动态页面的请求，如jsp、servlet，由Apache转发给Tomcat处理，可以有效提高服务器性能。），如果确认不使用AJP 1.3 Connector，则必须删除。
+      实施指导：
+      删除$tomcat/conf/server.xml中不用的AJP 1.3 Connector：
+      注释或删除$tomcat/conf/server.xml文件中的如下内容：
+      <Connector port="8009" protocol="AJP/1.3" redirectPort="8443" />
+      备注：如果使用AJP Connector，应该修改默认的8009端口为其他端口，如3039；
+      其他不使用的Connector（Protocol）也需要删除。
+
+  规则2.2.14：修改Tomcat版本信息
+      说明：Tomcat的server.info、server.number、server.built字段包含了服务器的版本等信息，黑客通过这些信息可以更轻易地知道对应Tomcat版本的安全缺陷。注意：修改之前建议备份当前的版本信息，以便后期维护、版本升级时能够查到实际版本信息。
+      1.从catalina.jar中抽取出ServerInfo.properties文件
+        Tomcat5.5：$ cd $tomcat/server/lib
+        Tomca6.0：$ cd $tomcat/lib
+        $ jar xf catalina.jar org/apache/catalina/util/ServerInfo.properties
+      2.编辑ServerInfo.properties
+        vi org/apache/Catalina/util/ServerInfo.properties
+      修改server.info、server.number和server.built参数的值：
+      server.info=WebServer                    //参数属性值可根据需要自行修改
+      server.number=9.0                            //参数属性值可根据需要自行修改
+      server.built=Oct 07 2012 01:13:50                //参数属性值可根据需要自行修改
+      3.使用修改后的ServerInfo.properties更新catalina.jar
+        $ jar uf catalina.jar org/apache/catalina/util/ServerInfo.properties
+      4. 删除操作过程中产生的org目录及文件
+      $ rm -rf org
+      备注：步骤2中的参数属性值可根据需要自行修改，修改的值不应该体现实际的Tomcat版本信息。
+      使用Eclipse集成Tomcat时，如果修改了ServerInfo.properties，会报找不到Tomcat的错误。这是由于Eclipse也需要读取ServerInfo.properties造成的。可以在开发阶段先不修改，在发布版本时再修改Tomcat版本信息。
+      说明：
+      1、OpenAS通过修改Tomcat源码，当服务端处理出错并返回错误信息给客户端时不会携带ServerInfo.properties文件中的原生tomcat版本号给客户端，而是返回空字符串，以满足该规则的目的；
+      2、个别客户/局点可能会严格检查该jar文件，需要业务在版本发布前手工修改该文件。因为如果由OpenAS修改好后发布，业务拿到OpenAS版本后无法在Eclipse中配置后进行开发，每个开发人员必须手动修改回原生Tomcat版本，工作量更大，所以建议业务在发布时修改。
+
+  规则2.2.15：禁用 X-Powered-By HTTP头并重命名所有Connector的Server 值
+      说明：xpoweredBy设置决定了Tomcat是否在X-Powered-By HTTP Header中提供其版本等信息，设置为false可以使攻击者更难获知服务器的安全缺陷。
+      Tomcat默认配置中，Connector标签中无Server属性，在HTTP响应消息中，将默认携带服务器的实现及版本信息，如Server: Apache-Coyote/1.1，攻击者可以使用所公开的信息来获取所标识的版本的特定安全漏洞，对服务器做进一步的攻击。
+      1.在$tomcat/conf/server.xml文件中每一个Connector中加上xpoweredBy属性并设置为false，或者保证Connector中没有xpoweredBy
+      <Connector ... xpoweredBy="false" />
+      2.在$tomcat/conf/server.xml文件中每一个HTTP Connector中加上server属性并设置为非空值（建议设置为模糊信息，比如：huawei，可根据产品定义自行修改）
+      备注：AJP Connector没有server属性
+
+  规则2.2.16：禁用额外的路径分隔符
+      说明：允许额外路径分隔符会导致黑客访问原本不可见的应用或区域
+      在启动脚本$tomcat/bin/catalina.sh中添加如下命令：
+      -Dorg.apache.catalina.connector.CoyoteAdapter.ALLOW_BACKSLASH=false 
+      -Dorg.apache.tomcat.util.buf. UDecoder.ALLOW_ENCODED_SLASH=false
+      备注：这两个参数默认值为false。如果在启动脚本中未发现这两个参数，则不用添加。
+
+  规则2.2.17：禁用自定义头状态信息
+      说明：允许将用户提供的数据放入头中可能导致XSS攻击
+      在启动脚本$tomcat/bin/catalina.sh中添加如下命令：
+      -Dorg.apache.coyote.USE_CUSTOM_STATUS_MSG_IN_HEADER=false
+      备注：该参数默认值为false。如果在启动脚本中未发现该参数，则不用添加。
+
+  规则2.2.18：禁止以特权方式运行应用
+      说明：以特权方式运行应用会允许应用加载管理库
+      在所有的context.xml中设置
+      <Context ... privileged= "false" />
+      备注：该参数默认值为false，如果未发现该参数，则不用设置。
+
+  规则2.2.19：不解析日志阀上的主机
+      说明：如果将日志阀里面的resolveHosts设置为true，那么在记录信息之前会先进行DNS查询，增加额外资源消耗。
+      在所有有Valve节的context.xml和server.xml中设置
+      <Valve ... resolveHosts= "false" />
+      备注：该参数默认值为false，如果Valve节中未发现该参数，则不用设置。
+
+  规则2.2.20：业务运行时限制对敏感包的访问
+      说明：在服务器中有一些受限访问的包或未知包，这些包可能是恶意软件或者会影响应用程序，需要防止Web应用程序访问这些包。
+      实施指导：
+      在$tomcat/conf/ catalina.properties中添加
+      package.access = sun.,org.apache.catalina.,org.apache.coyote.,org.apache.tomcat., org.apache.jasper
+      备注：Tomcat的默认值即是如此，只需要检查确认未人工修改过即可。
+
+  规则2.2.21：使用CorsFilter限制跨源访问
+      说明：Tomcat 7.0.41及以后版本增加了实现 CORS 的 Servlet 过滤器，使用该过滤器可以限制跨源访问。若应用程序不需要跨源能力，则无需配置CorsFilter（默认不配置安全），，此时Tomcat是不启用跨源控制功能的；若需要启用跨源访问控制，请参考如下实施指导：
+      实施指导：
+      在$tomcat/conf/web.xml中添加
+      <filter>
+       <filter-name>CorsFilter</filter-name>
+       <filter-class>org.apache.catalina.filters.CorsFilter</filter-class>
+       <init-param>
+        <param-name>cors.allowed.origins</param-name>
+        <param-value>http://www.website.com</param-value> 
+       </init-param>
+       <init-param>
+        <param-name>cors.allowed.methods</param-name>
+        <param-value>GET,POST,HEAD,OPTIONS,PUT</param-value>
+       </init-param>
+       <init-param>
+        <param-name>cors.allowed.headers</param-name>
+        <param-value>Content-Type,X-Requested-With,accept,Origin,Access-Control-Request-Method,Access-Control-Request-Headers, Last-Modified</param-value>
+       </init-param>
+       <init-param>
+        <param-name>cors.exposed.headers</param-name>
+        <param-value>Access-Control-Allow-Origin,Access-Control-Allow-Credentials</param-value>
+       </init-param>
+       <init-param>
+        <param-name>cors.support.credentials</param-name>
+        <param-value>true</param-value>
+       </init-param>
+
+      </filter>
+      <filter-mapping>
+       <filter-name>CorsFilter</filter-name>
+       <url-pattern>/*</url-pattern>
+      </filter-mapping>
+      备注：只有Tomcat 7.0.41及以后版本才支持。
+      cors.allowed.origins参数应该只配置允许跨源访问的源列表，例如www.website.com，不建议配置*。
+
+  规则2.2.22：Tomcat配置SSL时，需要使用安全的协议TLSV1.2、TLSV1.1
+      说明：当Tomcat启用SSL时，需注意防范POODLE漏洞，在配置HTTPS connector时设置sslProtocol=" TLSv1.1, TLSv1.2"（6.0.38之前版本）或sslEnabledProtocols = " TLSv1.1,TLSv1.2"（6.0.38及以后版本），请参考如下实施指导：
+      实施指导：
+      修改https参数
+      <Connector port="443" protocol="HTTP/1.1" SSLEnabled="true"
+                maxThreads="150" scheme="https" secure="true"
+                sslEnabledProtocols="TLSv1.1,TLSv1.2"
+                ciphers="TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256, TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384,TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA,TLS_RSA_WITH_AES_256_CBC_SHA256, TLS_RSA_WITH_AES_256_CBC_SHA"
+                keystoreFile="c:/key.store" keystorePass="ChangeMe@123"
+      备注：
+      1.配置细节可以参考《web应用安全开发规范》的“附件1 Tomcat配置SSL指导.doc”；
+      2.keystoreFile参数的文件名请使用绝对路径，keystorePass参数上的口令即使用keytool 生成证书时的storepass口令。
+      3.当前示例中，keystorePass不能明文存储，可以参考《Tomcat中证书库文件口令加密实现指导1.1》或《Tomcat SSL证书密码加密方法2》来实现；
+      4.上述配置，不同的tomcat版本，其配置项可能有一定差别。
+      5.请在启用SSL的Connector上配置 scheme="https"，保证request.getScheme()返回准确的值。
+      6. 请在启用SSL的Connector上配置 secure="true"，保证request.isSecure()返回true。
+
+      配置需要强制使用SSL的目录或文件
+      例如对于/SSL目录下的所有文件和/test/login.jsp需要强制使用SSL，则编辑Tomcat对应web应用目录下的WEB-INF/web.xml，在<web-app>节中加入如下配置：
+      <security-constraint>
+            <web-resource-collection>
+            <web-resource-name>SSL</web-resource-name>
+            <url-pattern>/SSL/* </url-pattern>
+            <url-pattern>/test/login.jsp</url-pattern>
+            </web-resource-collection>
+            <user-data-constraint>
+            <transport-guarantee>CONFIDENTIAL</transport-guarantee>
+            </user-data-constraint>
+      </security-constraint>
+
+  规则2.2.23：为Tomcat配置JRE memory leak listener
+      说明：Tomcat为JRE的一些已知的内存泄露问题提供了解决方案：使用JRE Memory Leak Prevention Listener可以预防此类问题。
+      此配置能够预防的内存泄露种类详情请查阅：
+      https://tomcat.apache.org/tomcat-7.0-doc/config/listeners.html#JRE_Memory_Leak_Prevention_Listener_-_org.apache.catalina.core.JreMemoryLeakPreventionListener
+      实施指导：
+      检查$tomcat/conf/server.xml中是否存在JRE Memory Leak Prevention Listener配置，若未配置，请添加（或者解除注释）：
+      <Listener className="org.apache.catalina.core.JreMemoryLeakPreventionListener" />
+
+  规则2.2.24：为Tomcat配置Security Lifecycle Listener
+      说明：当Tomcat启动时，Security Lifecycle Listener会执行一些安全检查，若检查失败，该Listener会阻止Tomcat启动。
+      Security Lifecycle Listener检查内容包含：
+      1.	检查Tomcat 启动时所使用的账号是否在指定的黑名单中（若未配置黑名单，黑名单中默认值为root）；
+      2.	检查Tomcat启动时umask是否符合配置的最小限制（若未指定，则使用默认值0007）。
+      实施指导：
+      在$tomcat/conf/server.xml中增加（或者解除注释）Security Lifecycle Listener配置
+       <Listener className="org.apache.catalina.security.SecurityListener" checkedOsUsers="root,alex,bob" minimumUmask="0007" /> 
+      在catalina.sh文件中，解除如下注释（该配置仅与umask检查相关）：
+      JAVA_OPTS="$JAVA_OPTS -Dorg.apache.catalina.security.SecurityListener.UMASK=`umask`"
+      备注：
+      checkedOsUsers根据实际场景配置tomcat启动时检查的账号黑名单，采用“,”分隔,默认值为root；
+      minimumUmask在window环境下不会执行检查；默认值为0007.
+
+  2.3	文件目录的控制权限
+  规则2.3.1：Tomcat根目录只能由Tomcat属主用户修改（755），Tomcat根目录的所有父级目录的修改权限不能赋予除超级管理员用户和Tomat属主的其他普通用户。
+      说明：不仅文件本身，tomcat根目录（$CATALINA_HOME）必须只能由属主来改写，Tomcat根目录的所有父级目录的修改权限不能赋予除超级管理员用户和Tomat属主的其他普通用户。采用多实例运行的Tomcat,也要对$CATALINA_BASE目录进行同样的权限限制。
+      实施指导：
+      如果要配置Tomcat根目录为/home/tomcat，首先要确认/、/home目录只能由root修改，/home/tomcat目录只有root和Tomcat属主用户才有修改权限，其他用户不能具备这些目录的修改权限，其次要使用Tomcat属主用户执行下列命令：
+      # chmod 755 . bin conf
+      备注：这里要求的权限如755是最大权限，如果业务不需要这么大的权限可以根据业务需求适当放小，下同。
+      若配置$CATALINA_BASE,该目录也需要进行同样的权限限制。
+
+  规则2.3.2：可执行文件只能由Tomcat属主用户修改（700）。
+      说明：如果允许非属主用户对由属主执行或读写的文件有写权限，则会危及系统。比如，别人有可能会覆盖可执行文件或脚本，那么下一次启动时，就会执行恶意代码。
+      实施指导：
+      设置可执行文件的权限，例如bin目录下的执行文件，使用Tomcat属主用户执行下列命令：
+      # cd $tomcat/bin
+      # chmod 600 *
+      # chmod 700 *.sh
+      备注：如果Tomcat是独立安装部署的，并和其他容器之间存在相互调用的关系，那么，可执行文件的权限需要由Tomcat属主用户修改成711。
+
+  规则2.3.3：配置目录和文件只能由Tomcat属主用户修改（600）。
+      说明：其他用户有可能会覆盖、篡改配置文件，从而获取更高的权限或者更多的信息。
+      实施指导：
+      配置目录的Owner必须为Tomcat属主用户，并设定权限：
+      # chmod 600 $tomcat/conf
+      设置配置文件的权限，conf目录下的配置文件，使用Tomcat属主用户执行下列命令：
+      # cd $tomcat/conf
+      # chmod 600 *
+      备注：
+      配置目录中文件通常包含：catalina.policy、catalina.properties、context.xml、logging.properties、server.xml、tomcat-users.xml、web.xml；
+      Tomcat6.0.1x版本中，tomcat-user.xml文件的权限无法被修改成700，每次Tomcat启动会自动把tomcat-user.xml文件权限更新为644。tomcat-user.xml是Tomcat控制台的管理员用户信息文件，这里存在被操作系统其他用户读取的威胁，建议不要使用Tomcat控制台。
+
+  规则2.3.4：日志目录只能由Tomcat属主用户修改和执行（700）。
+      说明：如果日志目录对非属主用户是可写的，别人就有可能用一个指向其他敏感文件的连接来覆盖日志文件，使那个文件被改写为杂乱的数据。如果日志文件本身对非属主用户是可写的，别人就可能伪造日志。
+      实施指导：
+      使用Tomcat属主用户执行下列命令：
+      # cd $tomcat
+      # chmod 700 $tomcat/logs
+
+  规则2.3.5：临时目录只能由Tomcat属主用户修改和执行（700）
+      说明：限制对这些临时目录的访问，可以防止本地用户恶意或无意地影响Tomcat进程的完整性。
+      实施指导：
+      使用Tomcat属主用户执行下列命令：
+      # cd $tomcat
+      # chmod 700 $tomcat/temp
+
+  规则2.3.6：Web应用目录只能由Tomcat属主、属组用户修改和执行（750）
+      说明：限制对这些临时目录的访问，可以防止本地用户恶意或无意地影响Web应用程序的完整性。
+      实施指导：
+      使用Tomcat属主用户执行下列命令：
+      # cd $tomcat
+      # chmod 750 $tomcat/webapps
+
+  建议2.3.1：只对管理员等少数用户开放的web服务，建议采用IP或IP段控制访问。
+      说明：减少对外暴露的风险。
+      实施指导：
+      修改$tomcat/conf/context.xml配置文件如下：
+      <Valve className="org.apache.catalina.valves.RemoteHostValve"
+               allow="*.mycompany.com,www.yourcompany.com" />  
+      <Valve className="org.apache.catalina.valves.RemoteAddrValve" 
+      allow="192.168.5.*" /> 
+      备注：其中，RemoteHostValve过滤的是主机名，RemoteAddrValve过滤的是IP地址，Tomcat6在多个ip或多个域名之间，可以使用“,”分隔，但是Tomcat7要求必须使用正则表达式，不能再使用逗号分隔。
+
+
+  2.4	SSI和CGI配置策略
+      规则2.4.1：禁用SSI和CGI功能。
+      说明： SSI指令可以用于执行Tomcat JVM外部的程序，CGI脚本可以用于执行Tomcat的java虚拟机外部的程序，所以这是极度危险的。
+      实施指导： 
+      Tomcat默认不支持SSI和CGI，请确认配置文件$tomcat/conf/web.xml中，< servlet>标签下的SSI和CGI配置均处于xml注释状态。
+
+
+  2.5	日志访问控制策略
+      规则2.5.1：开启Tomcat的日志功能：正常的访问日志和错误请求日志。日志文件的记录中包含访问时间、内容、结果及请求用户的ip等关键信息。
+      说明：这些日志可以提供异常访问的线索。Tomcat可以记录所有的访问请求，同样，异常的请求也会记录。日志文件可以记录系统发生的重要事件，可以帮助我们找到安全事件的原因等等，因此，日志文件必须包含访问的关键信息，例如请求用户的ip、访问的网址等。
+      实施指导：
+      在配置文件$tomcat/conf/server.xml中，在<Engine>的<host>标签里添加如下内容：
+      <Valve className="org.apache.catalina.valves.AccessLogValve"
+                       directory="logs"  prefix="localhost_access_log." suffix=".txt"
+                       pattern="common" resolveHosts="false"/>
+      备注：该段信息默认存在<host>的标签的注释中，但是直接取消注释，并不能使其生效。例如Tomcat6.0.20便不支持除了<Engine>以外的标签。
+      在上文配置信息中的pattern参数，是用来配置日志基本格式的。
+      一般情况下，pattern可以直接设置成两种方式：common和combined，他们的真实值如下：
+      common  ：%h %l %u %t %r %s %b     //基本已经符合规则要求
+      combined：%h %l %u %t %r %s %b %{Referer}i %{User-Agent}i //增加了代理信息
+      参数值的具体含义如下：
+      %a	记录访问者的IP
+      %A	记录本地服务器的IP
+      %b	发送信息的字节数，不包括http头，如果字节数为0的话，显示为“-”
+      %B	发送信息的字节数，不包括http头
+      %h	设置resolveHosts为false时，这里就是IP地址，否则就是服务器名称
+      %H	访问者使用的协议，例如HTTP/1.1
+      %l	登录标识中的逻辑用户名，通常返回值为“-”
+      %m	请求的HTTP方法（GET，POST等）
+      %p	访问的端口
+      %q	查询字符串（即请求中?后面的部分）
+      %r	请求头，即请求的第一行（例如 POST / HTTP/1.1）
+      %s	响应请求的HTTP状态代码（例如 200，404等）
+      %S	用户的会话ID
+      %t	日期和时间
+      %u	得到了验证的访问者，否则就是"-"
+      %U	请求的URL地址
+      %v	服务器名称
+      %D	请求响应时间，单位是毫秒
+      %T	请求响应时间，单位是秒
+      %I	当前请求的线程名称（可以在后期用来堆栈比较）
+
+
+  规则2.5.2：Tomcat日志路径要限制其访问权限，只能由Tomcat属主、属组用户访问 
+      说明：对Tomcat的日志存放目录进行权限限制，可以增强应用程序运行时完整性和机密性，减少信息泄露。日志存放目录只允许Tomcat属主和属组用户访问。
+      实施指导：
+      在配置文件（Server.xml或Context.mxl）中检查配置中Valve组件的directory属性指向的目录：
+      <Valve className="org.apache.catalina.valves.AccessLogValve" directory="$CATALINA_HOME/logs/" prefix="access_log" fileDateFormat="yyyy-MM-dd.HH" suffix=".log" pattern="%t %H cookie:%{SESSIONID}c request:%{SESSIONID}r %m %U %s %q %r" />
+      设定该目录的owner为tomcat属主及属组，取消其他用户的权限：
+      # chown tomcat_admin:tomcat $CATALINA_HOME/logs
+       # chmod o-rwx $CATALINA_HOME/logs
+
+
+  2.6	已知安全漏洞防护
+      规则2.6.1：防护UTF-8导致的目录跨越漏洞。
+      说明：该问题属于Tomcat6.0.17之前的版本。漏洞的起因，在于Tomcat处理UTF-8编码时，没有正确转换，从而导致在处理包含%c0%ae%c0%ae的url时转换为类似../的形式，使得可以遍历系统任意文件，包括/etc/passwd等
+      实施指导：
+      方法一（推荐）：为适应国际通用性，必须使用UTF-8的产品，建议通过升级修正该漏洞：
+      1．	Tomcat6.0系列的版本，必须升级到6.0.17之后的稳定版本
+      方法二：非必须应用UTF-8的产品，可以通过禁用UTF-8的方式规避该漏洞：
+      1．	打开配置文件$tomcat/conf/server.xml和$tomcat/conf/context.xml
+      2．	禁用allowLinking
+      3．	禁用URIencoding，或者设置URIencoding不等于UTF8
+
+3	配套信息
+  1.	Tomcat官方安全网址：http://tomcat.apache.org/security.html
+  2.	Tomcat官方下载网址：http://tomcat.apache.org/whichversion.html
+
     
     
