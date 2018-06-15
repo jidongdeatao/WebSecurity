@@ -1,0 +1,938 @@
+目录
+简介	6
+使用对象	6
+适用范围	6
+指导解释	6
+用词约定	6
+术语解释	7
+1	权限管理	8
+1.1	权限最小化	8
+1.1.1  禁止直接使用root账号登录Linux系统	8
+1.1.2  除有明确特权需求，应用程序应以非root账号运行	9
+1.1.3  采用不同权限的帐号运行不同的应用并对帐号进行权限分离	9
+1.1.4  在运行时有特权需求的程序，在特权操作完后如后续无特权需求，必须使用setuid放弃特权	10
+1.1.5  使用sudo机制代替以root帐号登录运行特权程序的方式。	11
+1.1.6  应对允许使用su到root帐号的用户进行明确授权，非授权用户不能切换到root	11
+1.1.7  使用POSIX Capabilities功能避免直接使用root权限	12
+1.2	文件和目录权限	14
+1.2.1	系统中禁止有无主文件存在	14
+1.2.2  除有明确需求，应删除文件不必要的setuid和setgid位	14
+1.2.3	应为系统用户设置缺省的umask值	15
+1.2.4  使用特殊属性位Sticky位对共享目录权限进行控制	16
+1.2.5  利用特殊文件属性Append-only位保护系统命令行历史日志文件，防止内容被篡改	16
+2	访问控制	18
+2.1	自主访问控制	18
+2.1.1  使用POSIX ACL进行更细粒度的访问控制	18
+2.2	强制访问控制	20
+2.2.1  Linux系统上应安装强制访问控制系统作为应急的安全访问控制手段	20
+3	记录和审计	22
+3.1	监测、记录和审计	22
+3.1.1	启用inotify监控机制，以文件系统事件进行安全监控	22
+3.1.2	使用Auditd组件对系统中的重要目录或文件进行审计	24
+4	认证	26
+4.1	口令和账号	26
+4.1.1  使用shadow套件对系统账号口令进行分离保护	26
+4.1.2	Linux系统必须使用shadow套件对当前暂时不使用的账号进行锁定或登录限制	27
+4.1.3	使用shadow套件对系统口令的时效进行限制	29
+4.2	可插拔认证模块（PAM）	29
+4.2.1	使用PAM模块增强认证管理	29
+5	文件系统保护	31
+5.1	日志文件保护	31
+5.1.1  应将操作系统日志发送至外部服务器单独存储，确保日志不被篡改	31
+5.2	文件系统加密	31
+5.2.1	对含有重要信息的文件目录或分区进行加密处理	31
+5.3	分区和挂载	32
+5.3.1	对于系统中的重要目录必须根据存储目的不同进行分区隔离	32
+5.3.2	使用fstab对外接、日志存储分区进行访问控制。	32
+5.3.3	禁用自动工具对移动存储设备进行挂载	33
+6	网络防护	34
+6.1	网络防护能力	34
+6.1.1  使用sysctl工具增强系统网络防护能力	34
+6.1.2  使用iptables对系统中不使用的端口进行限制	35
+6.2	限制网络服务	35
+6.2.1  远程访问需使用SSH取代telnet	35
+6.2.2  系统中不应安装不安全的传统网络服务	35
+7	漏洞攻击防护	37
+7.1	地址随机化	37
+7.1.1  使用Linux自带的ASLR功能（地址空间布局随机化）增强漏洞攻击防护能力	37
+7.2	数据执行防护	37
+7.2.1  系统必须使用DEP防护手段提升漏洞攻击防护能力	37
+7.2.2  使用栈保护机制	38
+7.3	增强性安全防护	39
+7.3.1  使用Grsecurity增强Linux系统的安全防护能力	39
+7.3.2  使用PaX提升系统攻击防护能力	40
+8	完整性保护	43
+8.1	文件完整性检查	43
+8.1.1  使用IMA工具对系统文件的完整性进行检查	43
+9	安全隔离和容器	44
+9.1	安全隔离	44
+9.1.1  对于开放给第三方的shell环境，应使用隔离技术对其可访问的系统资源进行隔离	44
+9.1.2  对于系统中运行的第三方应用，需使用控制组或容器等技术手段将其于系统关键资源进行隔离。	46
+10	其他	47
+10.1	额外系统功能限制	47
+10.1.1  对core dump功能的使用进行限制	47
+10.1.2  关闭SysRq键的使用	47
+10.1.3  应对bootloader开启引导装载密码	48
+10.1.4  使用ulimit工具限制用户可以打开文件个数	48
+11	设计样例	50
+
+
+
+术语解释
+名词	解释
+MAC	强制访问控制（Mandatory Access Control——MAC），用于将系统中的信息分密级和类进行管理，以保证每个用户只能访问到那些被标明可以由他访问的信息的一种访问约束机制。
+DAC	自主访问控制（Discretionary Access Control，DAC）是这样的一种控制方式，由客体的属主对自己的客体进行管理，由属主自己决定是否将自己的客体访问权或部分访问权授予其他主体，这种控制方式是自主的。
+容器	容器是一种内核虚拟化技术，可以提供轻量级的虚拟化，以便隔离进程和资源，而且不需要提供指令解释机制以及全虚拟化的其他复杂性。
+PAM	PAM（Pluggable Authentication Modules ）是由Sun提出的一种认证机制。它通过提供一些动态链接库和一套统一的API，将系统提供的服务 和该服务的认证方式分开，使得系统管理
+员可以灵活地根据需要给不同的服务配置不同的认证方式而无需更改服务程序，同时也便于向系 统中添加新的认证手段。
+ASLR	ASLR（Address space layout randomization）是一种针对缓冲区溢出的安全保护技术，通过对堆、栈、共享库映射等线性区布局的随机化，通过增加攻击者预测目的地址的难度，防止攻击者直接定位攻击代码位置，达到阻止溢出攻击的目的。
+DEP	DEP (Data Execution Prevention) 是一套软硬件技术，能够在内存上执行额外检查以帮助防止在系统上运行恶意代码。
+ACL	访问控制列表（Access Control List，ACL）。
+
+1	权限管理
+1.1	权限最小化
+1.1.1  禁止直接使用root账号登录Linux系统
+说明：
+root是Linux系统中的超级特权用户，具有所有Linux系统资源的访问权限。如果允许直接使用root账号登录Linux系统对系统进行操作，会带来很多潜在的安全风险，为了规避由此带来的风险，应禁止直接使用root帐号登录操作系统，仅在必要的情况通过其他技术手段（如：su）间接的使用root账号。禁止直接使用root账号登录可以规避很多潜在的安全风险，提高系统安全性。
+此条目需满足以下要求：
+	禁止直接通过root账号远程登录系统（ssh远程登录）
+	禁止直接使用root账号本地标准终端登录（本地tty登录，如：tty1、tty2等）
+此条目对以下情况不做强制要求：
+	对于设备维护用串口不做强制要求，如console。
+	系统初始化和调测阶段不在规则范围内。
+实施指导：
+	禁止root账号本地直接登录
+1)	编辑root登录设备控制文件securetty
+vi /etc/securetty
+2)	注释掉或删除所有标准终端设备（形如ttyN，如：tty1、tty2等）
+#tty1
+#tty2
+…
+#ttyN
+3)	保存文件后root用户本地标准终端登录即被禁止
+Login： root
+Password：
+Login incorrect
+	禁止root账号远程直接登录
+例：修改openssh服务配置文件，禁止root账号远程直接登录
+1)	编辑openssh服务配置文件sshd_config
+vi /etc/ssh/sshd_config
+2)	查找PermitRootLogin配置项（若不存在需添加），将其设置为No
+PermitRootLogin No
+3)	保存文件后，重新启动sshd服务
+/etc/init.d/sshd restart
+
+1.1.2  除有明确特权需求，应用程序应以非root账号运行 
+说明：
+root权限是Linux系统中的超级特权用户，具有所有Linux资源的访问权限。若自研程序或者第三方程序存在堆栈溢出漏洞，那么攻击者就可以利用漏洞植入任意代码，获取程序执行者的权限，进而控制整个系统。因此，我们应该按照最小权限原则设计Linux系统权限，即使程序中存在堆栈溢出漏洞，由于被植入恶意代码的程序只有普通用户权限，无法对系统造成严重影响，攻击面大大降低。
+实施指导:
+比如一个程序在使用普通用户就可以正常运行的情况，就不应用 root帐号运行，按照安全设计的最小权限原则，分析应用程序进程所需要的最小权限，无特权需求的程序禁止使用root运行。实施方法如下：
+root# useradd huawei
+su - user -c program
+user代表用户名，program是程序名（这里要注意的是程序名要给决对路径）
+
+1.1.3  采用不同权限的帐号运行不同的应用并对帐号进行权限分离
+说明：
+在设计实现应用系统时，应根据各个组成部分（子系统或程序）运行所需的操作系统权限的不同以及暴露给用户的访问权限的不同，对其进行划分和授权，采用不同权限的帐号运行不同的程序或组成部分。
+此条目需满足以下要求：
+	运行web服务的系统帐号不能和运行数据库的系统帐号是同一个帐号，并且要做访问的权限分离。
+实施指导:
+例如典型的WEB应用系统，由WEB系统和数据库系统组成，WEB系统对外提供访问服务，外部用户通过WEB服务获取页面相关的数据，这此页面数据敏感度相对低一些，而数据库系统一般存放业务相关的重要数据，敏感度高，通常会为两个系统建立不同的帐号和权限，并分配不同的目录来存放敏感度不同的数据。对于WEB系统使用Apache服务器情况，会建立apache用户来运行httpd进程，限制httpd进程只能特定WEB文件、配置文件和日志数据，如var/www；同时，对数据库使用mysql的情况，也会为数据库建立专门的帐户mysql和相应的特权目录，让mysqld服务进程只能访问限定的目录，如var/lib/mysql。通过这样的划分和授权，达到用不同的权限帐号运行不同的程序并实现了运行权限的分离。
+
+1.1.4  在运行时有特权需求的程序，在特权操作完后如后续无特权需求，必须使用setuid放弃特权
+说明：
+程序中有些任务必需使用root权限执行，当特权操作完成后并且后续无特权需求，应调用setuid()函数放弃root用户的权利，使用普通用户权限运行程序。需要注意的是一旦调用setuid()函数放弃root用户的权利，在后续执行中这个进程就只能以普通用户的身份运行。
+此条目需满足以下要求：
+	在程序启动时需要特权需求，启动完成后不需要特权需求的程序，需放弃特权。
+实施指导:
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+int main()
+{
+  if( !setuid( getuid() ) )  \\抛弃root权限,进入普通用户权限
+  {
+    printf("setuid successfully!\n");
+  }else{
+    printf("setuid error!");
+    perror("setuid");
+  }
+  return 0;
+}
+
+1.1.5  使用sudo机制代替以root帐号登录运行特权程序的方式。
+说明：
+sudo可以使普通用户以特定的用户权限执行某些命令。大部分系统管理命令都需要使用root权限执行，对于系统管理员来说，适当的对其它用户授权可以减轻系统管理员负担，但直接授予其它用户root用户密码会带来安全方面的风险，而使用sudo可以解决这一问题。
+此条目需满足以下要求：
+	系统中的需要以root帐号执行的自开发程序，可以使用sudo机制避免使用root帐号登录。
+实施指导:
+下面看一个完整的例子：
+$ cat /etc/sudoers
+为方便对允许使用sudo命令的用户分类，我们可以用户分组：
+User_Alias NETWORK_ MAINTAINERS=www,com
+#定义NETWORK _COMMANDS可以运行网络接口配置命令
+Cmnd_Alias NETWORK _COMMANDS = /bin/ifconfig,/bin/ping
+# NETWORK_ MAINTAINERS用户组可以用 root身份运行NETWORK _COMMANDS中包含的命令
+NETWORK_ MAINTAINERS  localhost = (root) NETWORK _COMMANDS
+
+1.1.6  应对允许使用su到root帐号的用户进行明确授权，非授权用户不能切换到root
+说明：
+su命令可以使一个一般用户拥有超级用户或其他用户的权限，它经常被用于从普通用户账号切换到系统root账号。su命令为用户变更身份提供了便捷的途径，但如果不加约束的使用su命令，会给系统带来潜在的风险。通过对用户su访问root账户的权力进行限制，仅对部分账号进行su使用授权，可以提高系统账号使用的安全性。
+此条目需满足以下要求：
+	需建立su访问组，非组内帐号未无法使用su命令切换到root账号（包括在已知root口令的情况下）
+实施指导：
+	使用pam_limits模块限制su root的访问组
+例：通过组成员限制能够su为root的用户
+1)	编辑pam的su配置文件
+vi /etc/pam.d/su
+2)	查找auth required pam_wheel.so配置行（若不存在需添加），做如下设置：
+auth required pam_wheel.so group=wheel
+3)	保存文件后，根据需要将su授权的账号加入wheel组即可。
+usermod -a -G wheel testuser
+这样，只有wheel组的用户可以su到root（执行su的用户仍需要知道root口令，但未被授权的用户即使知道root口令也无法通过su切换为root用户。
+
+
+POSIX 能力(pcap)是一种分散root用户权利的方式，使用POSIX可以对具有特权需求的程序进行授权访问。在需要的时，通过POSIX可以把一项或几项特权赋予需要的程序。因此，POSIX以授予最小的完成工作所需的权限的方式提供一个更安全的选择，坚持了最小权限的安全原则。
+
+1.1.7  使用POSIX Capabilities功能避免直接使用root权限
+说明：
+某个程序运行权限为root,但是可能并不需要 root 权限的全部能力，以ping命令为例，ping命令可能只需要cap_net_raw能力来发送ICMP ping报文，对于root其它能力并不是必需的。因此，只需要将cap_net_raw能力分配ping命令，这样普通用户就可以使用ping命令了。使用setcap分配运行命令所需要的能力替换直接使用root。此功能需要内核版本在2.6.13以上，并且xattr（扩展文件属性）功能在内核设置中被打开。
+下表为setcap中提供的能力：
+名称	值	解释
+CAP_CHOWN	0	允许改变文件的所有权
+CAP_DAC_OVERRIDE	1	忽略对文件的所有DAC访问限制
+CAP_DAC_READ_SEARCH	2	忽略所有对读、搜索操作的限制
+CAP_FOWNER	3	以最后操作的UID,覆盖文件的先前的UID
+CAP_FSETID	4	确保在文件被修改后不修改setuid/setgid位
+CAP_KILL	5	允许对不属于自己的进程发送信号
+CAP_SETGID	6	允许改变组ID
+CAP_SETUID	7	允许改变用户ID
+CAP_SETPCAP	8	允许向其它进程转移能力以及删除其它进程的任意能力(只限init进程)
+CAP_LINUX_IMMUTABLE	9	允许修改文件的不可修改(IMMUTABLE)和只添加(APPEND-ONLY)属性
+CAP_NET_BIND_SERVICE	10	允许绑定到小于1024的端口
+CAP_NET_BROADCAST	11	允许网络广播和多播访问
+CAP_NET_ADMIN	12	允许执行网络管理任务：接口、防火墙和路由等
+CAP_NET_RAW	13	允许使用原始(raw)套接字
+CAP_IPC_LOCK	14	允许锁定共享内存片段
+CAP_IPC_OWNER	15	忽略IPC所有权检查
+CAP_SYS_MODULE	16	插入和删除内核模块
+CAP_SYS_RAWIO	17	允许对ioperm/iopl的访问
+CAP_SYS_CHROOT	18	允许使用chroot()系统调用
+CAP_SYS_PTRACE	19	允许跟踪任何进程
+CAP_SYS_PACCT	20	允许配置进程记帐(process accounting)
+CAP_SYS_ADMIN	21	允许执行系统管理任务：加载/卸载文件系统、设置磁盘配额、开/关交换设备和文件等
+CAP_SYS_BOOT	22	允许重新启动系统
+CAP_SYS_NICE	23	允许提升优先级，设置其它进程的优先级
+CAP_SYS_RESOURCE	24	忽略资源限制
+CAP_SYS_TIME	25	允许改变系统时钟
+CAP_SYS_TTY_CONFIG	26	允许配置TTY设备
+CAP_MKNOD	27	允许使用mknod()系统调用
+CAP_LEASE	28	允许在文件上建立租借锁
+CAP_SETFCAP	31	允许在指定的程序上授权能力给其它程序
+
+实施指导:
+参考设计样例中的《使用setcap避免直接使用root》方案
+
+1.2	文件和目录权限
+1.2.1	系统中禁止有无主文件存在
+说明：	
+无主文件（和目录）是指属于没有匹配到任何用户的用户ID的文件。通常管理员删除一个用户但是该用户在文件系统中尚有文件时会发生这种情况。同样的情况也会发生在用户组上。这些文件叫做未分组文件。如果新用户分配到某个已删除用户的用户ID，新用户将能够访问某些原本无意访问的文件。因此，应根据实际情况对其进行合理处理如删除、添加新的用户或用户组等。
+实施指导：
+可使用如下命令检查无主文件和未分组文件
+root # find / \( -nouser -o -nogroup \) –print
+
+1.2.2  除有明确需求，应删除文件不必要的setuid和setgid位 
+说明：
+非法带有setuid和setgid的可执行文件可能对系统造成威胁。因此，建议对除必须要带SUID位的可执行文件进行检查，删除不必要可执行文件的setuid和setgid位。必须要带SUID位的的可执行文件根据系统版本和配置不同会不同。
+此条目需满足以下要求：
+	公司自主开发的软件/程序需遵守本条目（操作系统自带程序不做严格限制）。
+实施指导：
+可使用如下命令来显示setuid 和setgid 可执行文件：
+root # find / -type f \( -perm -4000 -o -perm -2000 \) –print
+显然，命令结果中会列出很多设置了setuid/setgid 位的文件（例如/usr/bin/passwd 文件）：仔细确认文件列表并确认是否有必要设置该权限。
+如果确定某可执行文件没有必要设置setuid位，使用以下命令将其删除：
+root # chmod -s FILE
+
+1.2.3	应为系统用户设置缺省的umask值
+说明：
+umask设置了用户创建文件的默认权限。一般在/etc/profile、$ [HOME]/.bash_profile或$[HOME]/.profile中设置umask值。因此系统必须设置Umask值，普通用户推荐值为022,超级用户推荐值为027。如果用户希望创建的文件或目录的权限不是umask指定的缺省权限，可以修改缺省的umask值，然后再创建文件或目录。 
+实施指导：
+$umask
+查询默认的umask值
+020
+系统默认为020，更改为所希望的022
+$umask 022
+$touch testfile
+创建文件
+$ls -l testfile
+查看创建后的权限
+rxwr-xr-x admin admin 786 Nov 17 10:45 /home/ testfile
+
+1.2.4  使用特殊属性位Sticky位对共享目录权限进行控制
+说明：
+Sticky位是Linux系统下的一种特殊文件属性位，可用于加强对文件的权限管理，合理的使用Sticky位属性，能够帮助提高文件和目录的安全性。使用Sticky位对共享目录权限进行控制，可以防止共享目录中不属于自己的文件被恶意或无意删除。在Linux系统下，最典型的共享目录为用于临时文件存取的/tmp和/var/tmp目录。
+此条目需满足以下要求：
+	对/tmp和/var/tmp目录应设置Sticky位，确保用户（root除外）只能对自己建立的文件或目录进行删除/更名/移动等动作。
+实施指导：
+在Linux系统下，有一些特殊文件属性位用于加强对文件的权限管理，合理的使用这些特殊属性，能够帮助提高文件和目录的安全性。使用Sticky位对共享目录权限进行控制，可以防止共享目录中不属于自己的文件被恶意或无意删除。对不希望被修改的文件设置非可变位（Immutable bit），系统不允许对这个文件进行任何的修改。如果对目录设置这个属性，那么任何的进程只能修改目录中已存在的文件，不能建立和删除文件。对不允许修改历史内容的文件设置只追加位（Append-only bit），系统只允许在这个文件之后追加数据，不允许任何进程覆盖或者截断这个文件。如果目录具有这个属性，系统将只允许在这个目录下建立和修改文件，而不允许删除任何文件。
+	设置sticky位
+chmod +t /tmp
+$ ls -ld /tmp
+drwxrwxrwt 1 root root 786 Nov 17 10:45 /tmp
+注意：rwt权限中t代表sticky和execute位。如果显示的是T，那么只有sticky位置位了。
+
+
+1.2.5  利用特殊文件属性Append-only位保护系统命令行历史日志文件，防止内容被篡改 
+说明：
+在Linux系统下，有一些特殊文件属性位用于加强对文件的权限管理，合理的使用这些特殊属性，能够帮助提高文件和目录的安全性。对不允许修改历史内容的文件设置只追加位（Append-only bit），系统将只允许在这个文件之后追加数据，不允许任何进程覆盖或者截断这个文件。如果目录具有这个属性，系统将只允许在这个目录下建立和修改文件，而不允许删除任何文件。
+此条目需满足以下要求：
+	对系统中的用户命令行历史日志文件（典型名称如：.bash_history）设置只追加位（Append-only bit），防止日志被篡改。
+此条目对以下情况不做强制要求：
+	对命令行日志文件有定期截断或回滚需求的系统不做追加位（Append-only bit）设置的强制要求。
+实施指导：
+	设置非可变位和只追加位
+$ sudo chattr +ai test.txt
+$ lsattr test.txt
+----ia---------- test.txt
+ 
+2	访问控制
+2.1	自主访问控制
+2.1.1  使用POSIX ACL进行更细粒度的访问控制
+说明：
+虽然Linux系统提供了文件控制机制，但是也具有一些局限性。例如，一个目录只允许一个组访问。POSIX ACL提供了一种更加细粒度的访问控制机制，通过运用这种机制，文件系统对象可以为具体用户和组分配访问权限。每一个文件系统对象都有一条对应的访问ACL，用于控制对该对象的访问。此外，目录还可以包括一条缺省的ACL，该缺省ACL决定了本目录中创建的对象的首次访问ACL。此功能需要内核版本2.6以上，并且内核开启POSIX ACL、xattr功能 。此建议适用于提供对文件或目录的细粒度访问控制的情形，比如：同一个用户组中的两个用户，对特定的文件或目录，需要设定一个用户拥有写的权限，而另一个用户只拥有只读权限。
+此条目需满足以下要求：
+	对于特定的目录或文件仅允许特定的几个用户组或用户设置使用权限的情形，建议使用ACL进行细粒度的访问控制。
+POSIX ACL条目名称	解释	用法
+ACL_USER_OBJ	所有者的访问权限	user::
+ACL_USER	access rights of some specific user, other than the owner
+除所有者外，一些特定用户的访问权限	user:USERNAME:
+ACL_GROUP_OBJ	access rights of the group that owns the file
+文件所属组的访问权限	group::
+ACL_GROUP	access rights of some group that doesn’t own the file
+非文件所属组的访问权限	group:GROUPNAME:
+ACL_OTHER	access rights of anyone not otherwise covered
+所有没有覆盖用户的访问根限	other::
+ACL_MASK	maximum possible access rights for everyone, except for the owner and OTHER
+定义了ACL_USER, ACL_GROUP_OBJ和ACL_GROUP的最大权限。	mask:GROUPNAME:
+
+实施指导：
+下面用几个例子来解释这些概念：
+通过设置umask为027，设置新创建的文件组没有写权限和其他用户的没有任何权限
+$ umask 027
+$ mkdir directory
+$ ls -ld directory/
+drwxr-x--- 1 bob users 0 dec  1 15:10 directory/
+使用getfacl命令查看文件权限
+$ getfacl directory
+# file: directory
+# owner: bob
+# group: users
+user::rwx
+group::r-x
+other::---
+使用setfacl 添加用户alice的rwx权限
+$ setfacl --modify user:alice:rwx directory
+$ getfacl --omit-header directory
+user::rwx
+user:alice:rwx
+group::r-x
+mask::rwx
+other::---
+$ ls -ld directory
+drwxrwx---+ 1 bob users 0 joulu  1 15:10 directory
+
+2.2	强制访问控制
+强制访问控制(MAC)是一个安全系统，在这个安全系统中，主体的访问或者对某个对象的操作根据策略规则严格被操作系统进行了限制。主体通常是进程，而对象可以是文件、目录、共享内存、端口、设备等。主体和对象都分配了安全属性。当一个主体访问一个对象时，内核会对这些属性进行检查，并根据认证规则（策略）决定是否允许访问。
+MAC系统的策略由安全策略管理员控制。与自主访问控制不同，普通用户不能对其进行设置，不能对所拥有对象的访问规则进行自行设置。MAC系统为整个系统提供了一个全局加强的安全策略。
+
+2.2.1  Linux系统上应安装强制访问控制系统作为应急的安全访问控制手段
+说明：
+Linux系统上应该安装强制控制系统，当应用系统所依赖的组件存在漏洞时，MAC作为应急的安全访问控制手段被打开，以便应用系统的服务在特定情况下可以不被中断，同时保证系统安全。当前强制访问控制系统使用比较广泛的是AppArmor和SELinux两种，Apparmor比SELinux使用更简单，配置较容易，但安全性和灵活度上没有SELinux高，然而SELinux配置较复杂。SELinux与Apparmor最大的区别在于Apparmor使用文件名（路径名）作为安全标签，而SELinux使用文件的inode作为安全标签。下表是Apparmor与SELinux更详细的对比。
+	Apparmor	SELinux
+安全类型		路径名基于系统不需要标记或重新标记文件系统
+	当增量开发配置文件，不用修改其它配置文件，只要引用配置文件路径名。
+	路径名很容易理解和审核		为所有文件、进程打标签
+	标签标识沟通的渠道，因此增加新的配置文件可能需要修改现有的配置文件划分沟通渠道，增加策略制定难度
+	并非所有应用程序保留的标签
+影响		可自动化
+	易整合		难维护
+易用性		策略语言易使用、易修改、易审计
+	集成GUI/Console工具集
+	可用性是首要目标		复杂的策略语言
+	难管理的规则
+	缺少集成工具
+鉴于上述对比，如果对系统安全性要求不严格的情况，推荐优先选用Apparmor。
+
+此条目需满足以下要求：
+	系统中需安装Apparmor或SELinux一种强制访问控制系统，可以不启用。
+此条目对以下情况不做强制要求：
+	对系统不内统版本较低不支持安装或安装后对系统应用有影响的可以不强制安装。
+实施指导：
+参考设计样例中的《SELinux应用指南》、《SELinux进程隔离方案指导书》
+ 
+3	记录和审计
+3.1	监测、记录和审计
+3.1.1	启用inotify监控机制，以文件系统事件进行安全监控
+说明：
+Inotify 是基于inode级别的文件系统监控技术,是一种强大的、细粒度的、异步的机制，它满足各种各样的文件监控需要，可用于对文件系统进行安全监控，提高系统安全性。
+	Inotify 不需要对被监视的目标打开文件描述符，而且如果被监视目标在可移动介质上，那么在 umount 该介质上的文件系统后，被监视目标对应的 watch 将被自动删除，并且会产生一个 umount 事件。 
+	Inotify 既可以监视文件，也可以监视目录。 
+	Inotify 使用系统调用而非 SIGIO 来通知文件系统事件。 
+	Inotify 使用文件描述符作为接口，因而可以使用通常的文件 I/O 操作select 和 poll 来监视文件系统的变化。 
+此条目需满足以下要求：
+	开启inotify功能，对文件系统事件进行监控。/bin /etc
+此条目对以下情况不做强制要求：
+	对系统性能有严格要求，启用相关功能影响产品交付的，不做强制要求。
+实施指导：
+	确定内核是否支持inotify
+查看/proc/sys/fs/inotify/目录是否存在，从kernel 2.6.13开始，Inotify正式并入内核。 
+# ls /proc/sys/fs/inotify/
+max_queued_events max_user_instances max_user_watches
+
+其中inotify目录下的三个文件对应inotify 的默认内核参数
+/proc/sys/fs/inotify/max_queued_events 默认值: 16384 该文件中的值为调用inotify_init时分配给inotify instance中可排队的event的数目的最大值，超出这个值的事件被丢弃，但会触发IN_Q_OVERFLOW事件。
+/proc/sys/fs/inotify/max_user_instances 默认值: 128 指定了每一个real user ID可创建的inotify instatnces的数量上限。
+/proc/sys/fs/inotify/max_user_watches 默认值: 8192 指定了每个inotify instance相关联的watches的上限。
+注意: max_queued_events 是 Inotify 管理的队列的最大长度，文件系统变化越频繁，这个值就应该越大。
+如果在日志中看到Event Queue Overflow，说明max_queued_events太小需要调整参数后再次使用. 
+
+	安装inotify工具
+在Linux下使用inotify需要安装inotify-tools工具包，其中有两个主要的工具程序inotifywait和inotifywatch。其中，inotifywait执行阻塞，等待 inotify 事件，可以监控任何一组文件和目录，或监控整个目录树（目录、子目录、子目录的子目录等等）。Inotifywatch程序用于收集关于被监视的文件系统的统计数据，包括每个 inotify 事件发生多少次。
+
+	使用 inotify工具
+示例脚本：
+#!/bin/bash
+  inotifywait -mrq --timefmt '%d/%m/%y %H:%M' --format  '%T %w%f %e' --event modify,delete,create,attrib  /home/admin | while read date time file event
+  do
+      case $event in
+          MODIFY|CREATE|MOVE|MODIFY,ISDIR|CREATE,ISDIR|MODIFY,ISDIR)
+                  echo $event'-'$file
+              ;;
+          MOVED_FROM|MOVED_FROM,ISDIR|DELETE|DELETE,ISDIR)
+                  echo $event'-'$file
+              ;;
+      esac
+  done
+
+在示例脚本中，仅对部分文件系统事件进行了监控，以下为inotify可以监控的文件系统事件：
+IN_ACCESS : 即文件被访问 
+IN_MODIFY : 文件被 write 
+IN_ATTRIB : 文件属性被修改，如 chmod、chown、touch 等 
+IN_CLOSE_WRITE : 可写文件被 close 
+IN_CLOSE_NOWRITE : 不可写文件被 close 
+IN_OPEN : 文件被open 
+IN_MOVED_FROM : 文件被移走,如 mv 
+IN_MOVED_TO : 文件被移来，如 mv、cp 
+IN_CREATE : 创建新文件 
+IN_DELETE : 文件被删除，如 rm 
+IN_DELETE_SELF : 自删除，即一个可执行文件在执行时删除自己 
+IN_MOVE_SELF : 自移动，即一个可执行文件在执行时移动自己 
+IN_UNMOUNT : 宿主文件系统被 umount 
+IN_CLOSE : 文件被关闭，等同于(IN_CLOSE_WRITE | IN_CLOSE_NOWRITE) 
+IN_MOVE : 文件被移动，等同于(IN_MOVED_FROM | IN_MOVED_TO)
+
+3.1.2	使用Auditd组件对系统中的重要目录或文件进行审计
+说明:
+Auditd程序是Linux审计框架的用户空间组件， Auditd组件提供了auditctl、ausearch、aureport三个程序完成审计和查看日志功能。配置审计规则是通过auditctl程序完成的，该程序启动时从/etc/audit/audit.rules读取这些规则。后台程序本身可以通过设置/etc/audit/auditd.conf 文件来进行定制。其他两个组件分别是audispd和 autrace。Audispd用于给其他应用发送事件通知，而autrace则通过与strace类似的方式对系统调用进行追踪。系统中一些文件是非常重要的，是不可以轻意修改的，对于这类文件使用Auditd程序对其进行审计是非常有必要的。
+此条目需满足以下要求：
+	/etc/passwd、 /etc/shadow系统文件应进行审计。
+	密钥文件应进行审计。
+实施指导 ：
+如何审计对特定文件的访问：
+root # auditctl -D
+No rules
+root # auditctl -w /etc/shadow -k fk_shadow2
+root # su bob
+$ exit
+exit
+root # ausearch -k fk_shadow2
+---
+time->Tue Dec  9 13:13:03 2014
+type=CONFIG_CHANGE msg=audit(1418123583.368:1756): auid=1000 ses=1 op="add rule" key="fk_shadow2" list=4 res=1
+---
+time->Tue Dec  9 13:13:13 2014
+type=PATH msg=audit(1418123593.100:1758): item=0 name="/etc/shadow" inode=382852 dev=08:02 mode=0100640 ouid=0 ogid=15 rdev=00:00
+type=CWD msg=audit(1418123593.100:1758):  cwd="/home/bob/Desktop"
+type=SYSCALL msg=audit(1418123593.100:1758): arch=c000003e syscall=2 success=yes exit=3 a0=7f526ad5d076 a1=80000 a2=1b6 a3=7f526ad5cfe9 items=1 ppid=4561 pid=4730 auid=1000 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=pts2 ses=1 comm="su" exe="/bin/su" key="fk_shadow2"
+以上实现的基础就是使用auditctl -D命令来检测所有的审计规则，然后使用auditctl –w添加一条规则。需要监控的文件是/etc/shadow，而且为了方便搜索，审计日志应为该事件添加一个fk_shadow2标签。然后root用户使用su bob命令切换到用户bob并使用exit迅速退出bob的shell。为获取密码信息，执行Su命令使系统访问/etc/shadow 文件。然后我们便可以使用ausearch命令来搜索带fk_shadow2.标签的事件。列表显示了两条表项，其中一条用于设置规则，另一条用于/bin/su 命令。
+
+
+
+
+
+4	认证
+4.1	口令和账号
+4.1.1  使用shadow套件对系统账号口令进行分离保护
+说明：
+Shadow 套件是密码和用户账号管理的程序和库模块的集合。目前主流的Linux用户认证依赖两个文件：/etc/passwd 和 /etc/shadow文件。而在一些旧的LINUX系统或某些被过度裁剪的发行版本中，在/etc/passwd 中同时保存了系统中所有的用户，帐号和密码哈希值。但是，密码哈希值被普通用户读取是不安全的，需将密码哈希值与帐号信息保存在不同的文件里，使用shadow套件可以达到此目标，shadow套件可以将用户帐号与密码哈希值进行有效隔离。shadow文件中除了保存有密码哈希值，还保存了密码有效期以及何时可以修改密码等信息。为保护系统安全，需要确保shadow文件只允许root账号有读写权限。
+实施指导：
+1)	备份系统原始命令
+Shadow Suite会替换系统内部分命令，在安装前需对这部分命令进行备份：
+/bin/su 
+/bin/login 
+/usr/bin/passwd 
+/usr/bin/newgrp 
+/usr/bin/chfn 
+/usr/bin/chsh 
+/usr/bin/id 
+2)	下载安装Shadow Suite
+# tar -xzvf shadow-current.tar.gz
+# cd /usr/src/shadow-YYMMDD
+# cp Makefile.linux Makefile
+# cp config.h.linux config.h
+# make all
+# make install
+3)	使用pwconv分离出passwd和shadow文件
+# cd /etc
+# /usr/sbin/pwconv
+4)	Pwconv输出的分离文件名称为npasswd和nshadow，需重命名复制到/etc目录中使用，在复制前应对原passwd文件进行备份。
+# cd /etc
+# cp passwd ~passwd
+# chmod 600 ~passwd
+# mv npasswd passwd
+# mv nshadow shadow
+5)	确保passwd和shadow文件的权限正确，如：
+chown root.root passwd
+chown root.shadow shadow
+chmod 0644 passwd
+chmod 0640 shadow
+6)	现在登录系统账号即已开始使用新的shadow passwd机制
+
+4.1.2	Linux系统必须使用shadow套件对当前暂时不使用的账号进行锁定或登录限制
+说明：
+对于Linux系统中当前暂时不使用的账号，如系统中某些默认账号、用户账号，应进行锁定或登录限制。
+此规则要求做到以下几点：
+	对于现在未使用的账号，进行账号锁定
+	对无登录需求的账号，设置为不可登录
+实施指导：
+可通过以下方法对帐号进行锁定
+1.将shadow文件中修改某个帐号的第二个字段，限制该帐号登陆，该方法无法限制root用户使用su的方式切换到该帐号。修改方式有以下两种：
+1）将shadow文件中修改某个帐号的第二个字段改为*，限制该帐号登陆，该方法的缺点是要想让锁定的帐号重新拥有登陆权限需要重置密码。
+以下是shadow文件的部分示例：
+/etc/shadow:
+postfix:*:16400:0:99999:7:::
+2）在shadow文件中修改某个帐号的第二个字段开头加入’!’，可以使用usermod –L USERNAME进行修改或直接修改。
+以下是shadow文件的部分示例：
+/etc/shadow:
+test:!$2y$10$ROmaUOTtnnlUFx/0e0oaPOE27vJv7m0Iv6Z2h9govhF.FDFtSVy8W:16737:0:99999:7:::
+2.也可以通过修改passwd文件把用户的登录shell设置为/sbin/nologin或/bin/false来限制用户登陆。该方法的好处在于修改后root用户也无法用su方式切换到该帐号。修改方式有以下两种：
+1）可使用命令来修改passwd文件限制用户的登录：
+usermod -s /sbin/nologin USERNAME
+2）直接修改passwd文件将最后一个字段改为/sbin/nologin或/bin/false
+以下是passwd文件的部分示例：
+/etc/passwd:
+postfix:x:51:51:Postfix daemon:/var/spool/postfix:/bin/false
+root:x:0:0:root:/root:/bin/bash
+suse-ncc:x:104:106:Novell Customer..:/var/lib/YaST2/suse-ncc-fakehome:/sbin/nologin
+uucp:x:10:14:Unix-to-Unix CoPy system:/etc/uucp:/bin/false
+
+
+
+4.1.3	使用shadow套件对系统口令的时效进行限制
+说明：
+长期使用同一个口令将会增加口令被破解的可能（如暴力破解），因此，口令必须要求在一段时期内有效。
+此条目需满足以下要求：
+	需限制密码的最大有效天数，推荐值为90天，如果系统存在长期无需登录的情况不做强制要求。
+	需限制密码的最小有效天数，该值可设为0。
+	需设置密码即将到期天数提醒，推荐值为30天。
+	需设置密码最小长度，该值不能小于6，如系统中使用pam_cracklib模块，该参数将不再有效。
+实施指导：
+Shadow套件对口令的时效的配置文件是 /etc/login.defs，可通过以下配置项对密码时间限制进行设置：
+root# cat /etc/login.defs
+PASS_MAX_DAYS   90
+PASS_MIN_DAYS   0
+PASS_WARN_AGE   30
+PASS_MIN_LEN   6
+4.2	可插拔认证模块（PAM）
+PAM （Pluggable Authentication Modules ）是一种认证机制。它通过提供一些动态链接库和一套统一的API，将系统提供的服务和该服务的认证方式分开，使得系统管理员可以灵活地根据需要给不同的服务配置不同的认证方式而无需更改服务程序，同时也便于向系统中添加新的认证手段。
+4.2.1	使用PAM模块增强认证管理
+说明：	
+PAM认证是Linux服务器系统主流的安全认证模式，PAM模块提供了许多在原有Linux系统之上加强的手段，如：对口令复杂度检查、登录尝试次数限制、禁用历史密码等功能。
+此条目需满足以下要求：
+	密码最小可接受长度不能小于6。
+	密码字符要求至少包含数字和字母。
+	修改密码至少不能和当前密码相同。
+实施指导：
+	使用pam_tally2模块对登录尝试次数进行限制
+pam_tally2:该模块记录登录失败事件并在一定次数登录失败之后就不再允许登录。账号也因此被锁定一段时间，知道系统管理员解锁该账号。deny=N 选项将最大登录次数设置为N。选项unlock_time=N 设置达到最大登录次数之后账号被锁定的时长（秒）。比如我们希望认证4次失败后锁定2分钟，可在/etc/pam.d/login文件中做以下配置：
+auth     required       pam_tally2.so deny=4  unlock_time=120
+	使用pam_cracklib模块对口令复杂度进行检查
+pam_cracklib:该模块给password栈提供了质量检查。提示用户输入新密码之后又进行了多种测试，最重要的是检验了新密码是否是字典的一部分。同样也提供了多个配置项，可用于将密码要求与配置的策略对齐。比如我们希望密码长度不小于8，至少包含一个数字，一个字母，可在/etc/pam.d/passwd文件中做以下配置：
+password  required pam_cracklib.so  dcredit=-1 ucredit=-1  minlen=8
+	使用pam_pwhistory模块禁用历史密码
+pam_pwhistory:该模块使password栈能执行历史密码禁用功能。意味着用户不能再次使用指定个数旧密码。remember=N 选项设置记住的旧密码个数为N。比如我们希望设置的密码不是相当使用的密码，可在/etc/pam.d/passwd文件中做以下配置：
+password  required pam_pwhistory.so  remember=1
+
+ 
+5	文件系统保护
+5.1	日志文件保护
+5.1.1  应将操作系统日志发送至外部服务器单独存储，确保日志不被篡改
+说明：
+为确保操作系统日志文件不被系统用户恶意修改，可将日志发送到外部服务器单独存储，确保日志文件不被篡改。
+此条目需满足以下要求：
+	需将系统日志（/var/log/message）发送到外部服务器单独存储。
+此条目对以下情况不做强制要求：
+	对于用户不允许将日志转存的情况，不做强制要求。
+实施指导：
+因为不同的Linux版本对日志转发的方法各不相同，我们以suse为例，suse下使用syslog-ng日志服务，现在我们要将日志发送到日志服务器192.168.2.152上去。 配置方法如下： 
+修改 /etc/syslog-ng/syslog-ng.conf文件增加以下内容：
+destination d_loghost { udp("192.168.2.152" port (514)); }; 
+log {source(src); filter(f_messages); destination(d_loghost);}; 
+本例仅将messages日志同步到日志服务器
+
+5.2	文件系统加密
+5.2.1	对含有重要信息的文件目录或分区进行加密处理
+说明：	
+一个很典型的案例就是防止离线攻击时对敏感数据的非法访问。这就意味着攻击者可以获取系统的物理访问权限并通过启动自己的操作系统或移除某个物理媒介并在其他系统上安装该物理媒介的方式来分析该文件系统。预防这种攻击类型的唯一保护方式就是加密文件系统。加密方法有两种：一种是使用cryptsetup创建加密分区，别一种是使用ecryptFS 对文件目录进行加密。ecryptFS加密相对cryptsetup加密既有优点也有不足。cryptsetup加密工作在块（block）级别，要求另外的文件系统加载到自己的分区上，ecryptFS加密能在已存在的分区中工作，不需要划开特定块区域（block area）供其使用。同时也可以选择性的加密单个文件或文件夹。
+
+5.3	分区和挂载
+5.3.1	对于系统中的重要目录必须根据存储目的不同进行分区隔离
+说明：	
+隔离的原因有多个：第一个原因就是控制资源，确切的说是控制存储空间。比如说，有时候/tmp被进程填满了大量多余的超大文件。 如果该目录与其余的文件系统位于同一个分区，那么该分区的可用存储空间将急剧减少。如果目录是全局可写的，也就是说允许所有人写入，攻击者使用单个进程就可以占用整个分区。第二个原因是不同的分区可以有不同的选项和不同的权限，从而遵循最小权限原则。
+此条目需满足以下要求：
+	/tmp 是一个全局可写的目录，有时候进程会过度使用该目录，应该放到一个独立的分区。
+	/var 可能包含全局可写的文件或目录，应该放到一个独立的分区。
+	/var/log 用于记录日志。有时候日志过于详尽，很快就耗尽了可用空间，应该放到一个独立的分区。
+	/home 存储用户数据，应该放到一个独立的分区。
+
+5.3.2	使用fstab对外接、日志存储分区进行访问控制。
+说明：	
+对于外接、日志、临时存储分区中不应有可执行文件、特殊设备等文件出现，为了防止上述文件或设备给系统带来风险，可使用fstab在挂载时进行限制。
+此条目需满足以下要求：
+	需对外接、日志、临时存储分区设置nodev,nosuid,noexec选项。
+实施指导：
+root# cat /etc/fstab
+# <file system>        <dir>         <type>    <options>             <dump> <pass>
+/dev/sda1              /              ext4      acl,user_xattr          0      1
+/dev/sda2              /tmp           ext4      nodev,nosuid,noexec     0      0
+	nosuid:表示分区的二进制文件未使用setuid权限运行。这对安全来说很重要，应配置在不要求suid的所有分区。
+	noexec:表示该分区不能包含可执行的二进制文件。
+	nodev:表示该分区不能包含特殊设备。除root以外的所有分区都可配置该选项。注意chroot jails 通常需要分区包含特殊设备。在这种情况下，jail所在的分区不能配置nodev选项*。
+5.3.3	禁用自动工具对移动存储设备进行挂载
+说明：	
+移动存储设备对于系统来说一直都是潜在的风险。通常，恶意软件就是通过移动存储设备在系统之间传播的。因此，尽可能避免使用移动存储设备。如果必须要使用移动存储设备，应手动安装。
+示例：
+如：Autofs 自动安装工具，可自动安装移动存储介质，因此应禁用该工具。可使用以下命令检查Autofs 的状态：
+chkconfig --list autofs
+如果Autofs 处于禁用状态，命令输出信息应如下所示：
+Autofs  0:off  1:off  2:off  3:off  4:off  5:off  6:off
+在必要情况下，可执行如下命令禁用Autofs ：
+chkconfig autofs off
+需要安装移动存储设备时，应使用nodev， noexec 和nosuid 选项。
+举例说明如何将/dev/sdb1 设备安装到/media/usb_stick路径：
+mount  -o ro, nosuid,nodev,noexec  /dev/cdrom    /mnt/cdrom
+
+ 
+6	网络防护
+6.1	网络防护能力
+6.1.1  使用sysctl工具增强系统网络防护能力
+说明：
+Linux系统自身提供了许多安全机制用于应对一些常见的网络攻击，我们可以通过使用sysctl 工具对这些安全机制进行配置，增强系统网络防护能力。
+此条目需满足以下要求：
+	需对ICMP攻击进行防护。
+	需对DOS攻击进行防护。
+实施指导：
+在/etc/sysctl.conf文件中进行以下配置：
+net.ipv4.conf.all.send_redirects、net.ipv4.conf.default.send_redirects:ICMP重定向消息可将路由信息发送到网络中的其他主机。只有当设备是一台路由器的时候才需要开启。其他情况下，应将该参数设置为0.
+net.ipv4.conf.all.accept_redirects、net.ipv4.conf.default.accept_redirects:ICMP重定向消息可能会被用来恶意修改系统的路由表，可能会导致报文发送到错误的目的地。将这些参数设置为0可以防止系统接收ICMP重定向消息。
+net.ipv4.conf.all.secure_redirects:安全ICMP重定向消息是从缺省网关列表中的地址发出的重定向消息，但是网关可能被攻击。因此，推荐将该参数设置为0。
+net.ipv4.icmp_echo_ignore_broadcasts:该参数决定设备是否要回应ICMP echo消息和时间戳请求，对这些消息和请求来说，目的地址就是广播地址。无论是哪台设备发送的报文，报文都会发送到网络上的每一台设备上去。如果源地址是伪造的，就可能会导致网络上所有的设备发送恶意的echo报文给受害者（被伪造地址的设备）。推荐将该参数值设置为1。
+icmp_ignore_bogus_error_responses:如果将该参数设置为1，那么内核将不会对再次构造的仿冒应答记录日志。可以通过这种方式来防止系统被不相关的消息占用。推荐将该参数值设置为1。
+net.ipv4.conf.all.rp_filter、net.ipv4.conf.default.rp_filter:如果回应报文不是从请求报文出去接口进来的，该报文就是无效的并被丢弃。这样可以防止由攻击者发送无状态回应的伪造报文而产生DoS攻击。推荐将参数值设置为1。
+net.ipv4.tcp_syncookies:SYN cookie用于防止由于攻击者快速建立大量半连接而产生的DoS攻击。开启参数之后内核在回应报文中包含一个特殊构造的TCP序列号用来识别合法报文。推荐将该参数设置为1 
+
+6.1.2  使用iptables对系统中不使用的端口进行限制
+说明：
+linux系统共提供65535个端口用于提供网络服务，但在实际应用中我们的系统对外开放服务的端口是有限制的，其余端口应使用安全机制对其管理和限制，防止攻击者利用这些未使用的端口。
+此条目需满足以下要求：
+	对于不使用的端口，应限制tcp和udp协议端口。
+实施指导：
+对系统中没有对外开放服务的端口，应做以下限制
+root # iptables -A INPUT -p tcp --dport XXX -j DROP
+root # iptables -A INPUT -p udp --dport XXX -j DROP
+
+6.2	限制网络服务
+6.2.1  远程访问需使用SSH取代telnet
+说明：
+通过Telnet传输的数据都是明文，因此这种登录方式存在很大的安全隐患。如果网络遭到了“中间人”攻击就可以获取所有信息。SSH服务主要用于远程使用某个系统 ，设计的目的是用SSH来取代Telnet，通过使用SSH，可以把所有传输的数据进行加密，这样类似上面的“中间人”攻击方式就不可能实现了，而且它也能够防止DNS和IP欺骗。
+
+6.2.2  系统中不应安装不安全的传统网络服务
+说明：
+许多曾经流行的服务，因为其安全问题渐渐被更好更安全的服务取代，如果系统中带有不安全的传统网络服务将会为带来未知的安全隐患。
+此条目需满足以下要求：
+	禁止使用RSH远程访问服务。
+	禁止使用Talk通信服务
+	禁止使用TFTP文件传输服务
+实施指导：
+RSH服务的状态可以通过以下命令来查看：
+root # chkconfig --list rsh
+可执行以下命令来禁用RSH服务并卸载RSH客户端：
+root # chkconfig rsh off
+root # zypper remove rsh
+执行以下命令来查看talk的状态：
+root # chkconfig --list talk
+如果不需要，可使用以下命令禁用该服务并卸载talk客户端：
+root # chkconfig talk off
+root # zypper remove talk
+可使用以下命令来查看tftp 和 atftp的状态：
+root # chkconfig --list tftp
+root # chkconfig --list atftpd
+如果不需要，使用以下命令禁用tftp 和 atftp：
+root # chkconfig tftp off
+root # chkconfig atftpd off
+
+
+
+
+
+
+7	漏洞攻击防护
+7.1	地址随机化
+7.1.1  使用Linux自带的ASLR功能（地址空间布局随机化）增强漏洞攻击防护能力
+说明：
+ASLR通过每次将栈的起始位置、函数库和程序本身移至略微不同的位置，使得缓冲溢出攻击无法猜测正确的位置，导致攻击无法成功实施。在Linux内核2.6.12版之后ASLR是默认启用。
+此条目需满足以下要求：
+	开启内核ASLR功能
+此条目对以下情况不做强制要求：
+	如果有开启ASLR后出现软件不兼容或性能下降的情况，可以关闭相关项。
+实施指导：
+ASLR开启/关闭方法：
+在/proc/sys/kernel/randomize_va_space文件中写入1或2表示开启，建议写入2。
+在/proc/sys/kernel/randomize_va_space文件中写入0表示关闭。
+下表为每个值代表的含义：
+值	含义
+0	不存在随机化，表示一切都将位于静态地址中。
+1	只有共享函数库、栈、mmap’ed 内存、VDSO以及堆是随机的。
+2	完全随机化（默认）。使用brk()进行的旧式内存配置也将是随机的。
+
+
+7.2	数据执行防护
+7.2.1  系统必须使用DEP防护手段提升漏洞攻击防护能力
+说明：
+Linux内核版本2.6.8以后支持数据执行保护（DEP）。DEP是除ASLR之外防止利用缓冲溢出执行恶意代码的另一种方法。因为ASLR是增加了查找要执行的库函数的难度，DEP是将栈和数据段中可能会被攻击者修改的权限进行了移除。在编译应用程序时需增加-z noexecstack gcc编译选项实现DEP功能。
+此条目需满足以下要求：
+	自开发的软件系统需使用DEP防护手段。
+此条目对以下情况不做强制要求：
+	对于系统开发中使用的开源软件本条目不做强制要求。
+实施指导：
+Linux DEP防护在内核中是默认开启的，但是软件要在编译时添加-z noexecstack选项来支持DEP功能。
+root# gcc -z noexecstack -o exectest exectest.c
+
+7.2.2  使用栈保护机制
+说明：
+gcc编译器为位于栈的缓冲区执行了一个额外的保护机制。这种方式在函数开头将随机选择的整数值置于栈中。虽然导致了一小部分开销，但这会避免程序出现额外的缓冲溢出。同时也会使缓冲溢出攻击变得更难实施。需要注意的是该特性在gcc4.2或以上版本中支持。
+此条目需满足以下要求：
+	需开启-fstack-protector、-stack-protector-all、-stack-protector-strong选项中的一种选项。
+此条目对以下情况不做强制要求：
+	对性能要求比较敏感的产品，可根椐情况关闭该功能。
+实施指导：
+在gcc中与该特性相关的若干编译器标识：
+	-fno-stack-protector禁用栈保护（不建议使用）。
+	-fstack-protector 为栈中所有显示了8个或更长字节的函数增添了保护机制。
+	--param=ssp-buffer-size=N可被用于更改 -fstack-protector使用的8字节限制。
+	-stack-protector-all会对所有的函数进行堆栈保护，而-fstack-protector只会保护符合条件的函数（函数堆栈中包含字符、数组且符合ssp-buffer-size指定大小的函数才会得到保护）。-fstack-protector-all安全性更高，但是对程序性能影响更大。
+	-stack-protector-strong 介于 -fstack-protector 和 -stack-protector-all之间，采用更智能的规则来决定哪些函数该受益于栈保护机制。
+	-Wstack-protector编译器告警选项是可选的，作用是当启用-fstack-protector选项而又有函数未能被保护到（比如不符合ssp-buffer-size参数要求）时，会提示编译告警。
+建议使用-fstack-protector选项同时指定ssp-buffer-size参数大小(例如—param ssp-buffer-size=4)，并和-Wstack-protector一起使用。
+
+7.3	增强性安全防护
+7.3.1  使用Grsecurity增强Linux系统的安全防护能力
+说明：
+Grsecurity是用于Linux内核安全增强的项目，针对Linux内核的某些安全漏洞进行修补以及安全性的增强。当攻击者能够对系统的某部分进行攻击并控制目标系统的执行流程时，Grsecurity作为最后一道防线会发挥最大作用。它甚至能够避免零日攻击，因为对攻击者而言其加大了攻击难度。Grsecurity的主要功能为：内存加固、对ASLR的改善、可信路径执行（TPE）、基于角色的访问控制（RBAC）、Chroot增强、暴力利用保护、限制普通用户量可获得的详细系统信息量、加强系统审查等。
+
+此条目需满足以下要求：
+	开启Grsecurity的暴力利用保护功能
+	开启Grsecurity的chroot增强功能
+	开启到/dev/kmem，/dev/mem，/dev/port的限制
+此条目对以下情况不做强制要求：
+	Grescurity的license是GPL2的，如果产品存在不允许使用GPL2 license的情况可以不使用Grescurity。
+	对Grsecurity不提供明确支持的内核版本不做强制要求
+	对于/dev/kmem，/dev/mem，/dev/port有明确使用需求的产品不做强制要求
+实施指导：
+Grsecurity是针对主线的Linux内核应用的安全补丁文件。安装Grsecurity需要打补丁到内核，所以需要重新编译内核。
+1.	下载Grsecurity
+Grsecurity项目的官方主页为grsecurity.net，下载Grsecurity只需要根据所要patch的系统内核版本号到网站的download页面选择下载即可。
+如： wget http://grsecurity.net/stable/grsecurity-3.1-3.14.48-201507111210.patch
+2.	将Grsecurity patch到内核
+将下载的补丁文件使用patch命令刷新到内核源码中即可，如：
+# mv grsecurity-3.1-3.14.48-201507111210.patch /usr/src/linux
+# cd /usr/src/linux
+# patch -p1 < grsecurity-3.1-3.14.48-201507111210.patch
+3.	开启需要的grsecurity内核功能选项
+例如：开启chroot增强功能和暴力利用防护功能选项
+# make menuconfig
+然后进入grsecurity功能配置界面，
+选择:security option -> Grsecurity -> Customize Configuration -> Filesystem Protecton -> Chroot jail restrictions
+选择:security option -> Grsecurity -> Customize Configuration -> Memory Protecton ->Deter exploit bruteforcing
+选择:security option -> Grsecurity -> Customize Configuration -> Memory Protecton -> Deny reading/writing to /dev/kmem, /dev/mem, and /dev/port
+4.	编译安装内核，重新启动系统即可。
+
+7.3.2  使用PaX提升系统攻击防护能力
+说明：
+PaX是Grsecurity的一部分，为linux设计的防止缓冲区溢出的一个内核补丁，可以脱离Grsecurity独立使用。Pax注重在Linux内核的层面增强系统防漏洞攻击的能力，能提供最优秀的与缓冲区溢出相关的攻击防护能力，强于Linux自身提供的DEP和ASLR的攻击防护能力。因此，建议在Linux系统中使用PaX安全补丁。使用时注意PaX版本应与Linux内核版本对应。
+
+PaX	Address space layout randomization
+		Randomized ET_EXEC base
+	Randomized stack base
+	Randomized mmap() base
+	randomizes the executable base of programs
+	Binary markings	to defeat ret2libc attacks and all other attacks relying on known structure of a program's virtual memory.
+	executable space protection		Enforced non-executable pages
+	PAGEEXEC
+	SEGMEXEC
+	Restricted mprotect()
+	Trampoline emulation	using (or emulating in operating system software) the functionality of an NX bit (i.e., built-in CPU/MMU support for memory contents execution privilege tagging
+此条目需满足以下要求：
+	开启Pax中以下强化地址随机化功能：
+	用户空间堆栈栈顶随机化
+	Mmap基地址随机化（将包括所有库）
+	执行程序基地址随机化
+此条目对以下情况不做强制要求：
+	产品license同GPL2存在冲突的情况下，不要求使用PaX。
+	对PaX不提供明确支持的内核版本不做强制要求
+	对系统性能有严格要求，启用相关功能影响产品交付的，不做强制要求。
+实施指导：
+	安装Pax内核安全补丁
+1.	下载安装
+PaX可以独立安装，也可以随Grsecurity安装，此处以Grsecurity为例：
+# wget http://grsecurity.net/stable/grsecurity-3.1-3.14.48-201507111210.patch
+# mv grsecurity-3.1-3.14.48-201507111210.patch /usr/src/linux
+# cd /usr/src/linux
+# patch -p1 < grsecurity-3.1-3.14.48-201507111210.patch
+2.	开启地址空间随机化
+# make menuconfig
+进入grsecurity功能配置界面，
+-	选择:security option -> Grsecurity -> Customize Configuration -> PaX -> Address Space
+3.	开启用户空间堆栈栈顶随机化和Mmap基地址随机化
+-	选择:security option -> Grsecurity -> Customize Configuration -> PaX -> Address Space Layout Randomizat -> Randomize User stack and mmap() bases
+4.	编译安装内核，重新启动系统即可。
+
+ 
+8	完整性保护
+8.1	文件完整性检查
+8.1.1  使用IMA工具对系统文件的完整性进行检查
+说明:
+Linux完整性度量架构（IMA）在文件中的代码被执行之前测量文件的完整性。度量通过计算出文件内容的哈希摘要来进行，安装IMA需要内核版本在2.6.30以上，并且内核开启IMA功能。文件完整性检测可以即时发现文件、程序或配置未经授权的更改，其基本原理是存储参考信息，如计算出的文件源数据（文件的源数据包括：所有者用户和组id、安全标签、权限）的哈希值，并确保除了合理的安装过程不对这些文件进行更改，发现恶意软件修改现有的程序。
+此条目需满足以下要求：
+	Linux系统中以下目录的文件必须做完整性进行检查：/bin、 /etc、 /sbin、 /var、 /usr/bin、 /usr/sbin、 /lib、/usr/lib、 /sys、 /boot 、/dev。
+实施指导：
+参考设计样例中的《IMA实施指导书》
+
+ 
+9	安全隔离和容器
+9.1	安全隔离
+9.1.1  对于开放给第三方的shell环境，应使用隔离技术对其可访问的系统资源进行隔离
+说明：
+当系统中存在开放给第三方使用的shell环境时，要充分的考虑将系统本身的软件和第三方软件隔离，当第三方软件崩溃时，使其无法影响到系统自身软件程序的运行，并保护系统软件不被第三方shell用户调试、跟踪、分析。为了达到此目的，应使用安全隔离技术对此shell环境及其对应的用户账号所能访问的系统资源进行限制，将其行为和结果影响限定到可控范围，保障基础系统的安全性。 
+此条目需满足以下要求：
+	Shell环境应与系统的文件系统资源隔离，Shell的文件访问范围仅限于其对应账号的HOME路径内。
+实施指导:
+	选择chroot技术隔离shell环境
+chroot，即 change root directory (更改 root 目录)。在 linux 系统中，系统默认的目录结构都是以 `/`，即是以根 (root) 开始的。而在使用 chroot 之后，系统的目录结构将以指定的位置作为 `/` 位置。在经过 chroot 之后，系统读取到的目录和文件将不在是旧系统根下的而是新根下(即被指定的新的位置)的目录结构和文件，因此它带来的好处大致有以下3个：
+1)	增加了系统的安全性，限制了用户的权力； 
+在经过 chroot 之后，在新根下将访问不到旧系统的根目录结构和文件，这样就增强了系统的安全性。这个一般是在登录 (login) 前使用 chroot，以此达到用户不能访问一些特定的文件。
+2)	建立一个与原系统隔离的系统目录结构，方便用户的开发； 
+使用 chroot 后，系统读取的是新根下的目录和文件，这是一个与原系统根下文件不相关的目录结构。在这个新的环境中，可以用来测试软件的静态编译以及一些与系统不相关的独立开发。
+3)	切换系统的根目录位置，引导 Linux 系统启动以及急救系统等。 
+chroot 的作用就是切换系统的根位置，而这个作用最为明显的是在系统初始引导磁盘的处理过程中使用，从初始 RAM 磁盘 (initrd) 切换系统的根位置并执行真正的 init。另外，当系统出现一些问题时，我们也可以使用 chroot 来切换到一个临时的系统。
+	建立chroot环境
+1)	在将要chroot到的新的根路径下建立chroot需具备的目录，如：
+$NEWROOT/etc
+$ NEWROOT/lib
+$ NEWROOT/bin
+$ NEWROOT/sbin
+$ NEWROOT/usr/lib
+$ NEWROOT/usr/bin
+$ NEWROOT/usr/local
+$ NEWROOT/home
+2)	根据需要，将系统真实目录中的内容复制到NEWROOT下新建的目录内，在此过程中需要根据需要最小化的复制，剔除掉不希望开放给chroot目标的程序和配置文件，仅保留必要的文件。
+3)	删除掉存在风险的程序，如su，sudo、和设置了setuid位的程序。
+	为指定用户启用chroot login
+1)	构造用于chroot bash的jail bash程序，如下示例：
+	/* jail_bash.c */
+	int main(void) {
+		system(“/usr/bin/chroot –userspec=jailuser /home/jail /bin/bash”);
+		return 0;
+	}
+2)	将jail_bash.c编译为jail_bash程序，并将jail_bash复制到系统/usr/bin/目录。
+3)	设置jail_bash程序的权限和SETUID位
+chown root /usr/bin/jail_bash
+chgrp root /usr/bin/jail_bash
+chmod 755 /usr/bin/jail_bash
+chmod +s /usr/bin/jail_bash
+4)	编辑/etc/passwd文件，修改jailuser账号配置行中的shell设置。
+如：
+jailuser:x:1001:100::/home/jail:/bin/bash
+替换为
+ jailuser:x:1001:100::/home/jail:/usr/bin/jail_bash
+上述设置完成后，以jailuser账号登录的shell，将自动被chroot到/home/jail目录。
+
+
+9.1.2  对于系统中运行的第三方应用，或存在隔离和安全控制需求的自研软件，需使用控制组或容器等技术手段将其于系统关键资源进行隔离。
+说明：
+有些第三方应用可能会因为设计问题存在一些漏洞，这些漏洞可能导致系统资源被全部占用，如果第三方应用不能即时修复漏洞，将会影响系统的正常运行。因此，对第三方应用采用一些隔离手段可以有效降低系统的安全风险。
+容器为安全控制应用程序及其依赖的组件提供了便利。为保障自研或第三方软件的安全，并满足以下的安全性需求：与主机的操作环境进行隔离，同时避免在虚拟机上部署完整操作系统的开销；控制应用和依赖组件对系统关键资源的使用；将软件和它的依赖部署在一起，并易于部署。设计中应当使用容器技术，并部署到应用的生产环境中。
+此条目需满足以下要求：
+	需使用控制组、容器等一种技术手段对非开源的第三方应用进行内存、cpu资源的隔离。
+	需使用容器技术对存在隔离及安全控制需求的自研或第三方应用程序进行隔离。
+实施指导:
+参考设计样例中的《cgroup进程隔离方案指导书》
+ 
+10	其他
+10.1	额外系统功能限制
+10.1.1  对core dump功能的使用进行限制
+说明：
+缺省情况下应禁用core dump功能，因为core dump功能可能会包含进程内存里的敏感信息。但是有时产品需要开启core dump功能记录当时产生问题的原因，对于需要开启core dump功能的产品需对日志输入的路径进行限制，同时需限制路径只允许特定用户访问。
+此条目需满足以下要求：
+	在不使用core dump功能时应将其禁用。
+	在需要使用core dump功能时应限制core dump日志路径及且访问权限。
+实施指导：
+例一：禁止ulimits的core dump功能可通过以下方式设置：
+1.执行命令root # sysctl -w ‘fs.suid_dumpable=0’对其永久禁用
+2.在/etc/sysctl.conf中添加fs.suid_dumpable = 0对其永久禁用
+3.在/etc/security/limits.conf中添加 * hard core 0对其永久禁用
+4.使用ulimits –c 0 对当前会话禁用
+
+例二：限制core dump日志输出路径
+通过修改/proc/sys/kernel/core_pattern可以控制core dump日志文件保存位置和文件格式。下例为将所有的core dump日志文件生成到/home/admin/corefile目录下，文件名的格式为core-命令名-pid-时间戳
+echo "/corefile/core-%e-%p-%t" >/home/admin/corefile
+同时限定目录只允许admin访问
+chown admin /home/admin/corefile
+chmod 700 /home/admin/corefile
+
+10.1.2  关闭SysRq键的使用
+说明：
+SysRq使得具有物理访问的用户能够访问计算机中危险的系统级命令。因此，建议对SysRq的功能使用进行限制。
+实施指导：
+可通过/proc/sys/kernel/sysrq文件查看SysRq的状态如果大于1表示开启：
+#cat /proc/sys/kernel/sysrq
+在不需要的情况下，可通过下以方法禁用SysRq：
+# echo 0 > /proc/sys/kernel/sysrq
+如果需要永久禁用可在sysctl.conf中加入以下内容：
+kernel.sysrq = 0
+
+10.1.3  应对bootloader开启引导装载密码
+说明：
+应开启bootloader引导装载密码，至少要在设置启动参数前要求密码输入。可通过在配置文件中使用关键字password来实现该功能。
+实施指导：
+Grub启动的时候，你可以设定启动密码方法如下：
+打开终端，输入：
+grub-md5-crypt
+会提示输入一个密码。这个密码就是启动菜单解锁密码，所以请小心输入并牢记。需要输入两次，以确认输入正确。密码可以包含数字、字符和空格。
+密码输入完成以后，会输出一个密码的加密字符串，现在记录下这个字符串。现在，可以把这个字符串启动选项里面。
+打开/boot/grub/menu.lst文件，在文件的顶端，加入一行：
+password --md5 c4b89e08456ce27d017e2efd322fd157
+其中“c4b89e08456ce27d017e2efd322fd157”就是你刚才得到的字符串。
+
+10.1.4  使用ulimit工具限制用户可以打开文件个数
+说明：
+在Linux系统中可以打开的文件个数是有限制的，如果全部资源被某个用户全部占用，其他用户将无法正常打开文件。
+此条目需满足以下要求：
+	需对用户打开的文件个数做限制。
+实施指导：
+我们限制每个用户最多可以打开65536个文件，只需在/etc/security/limits.conf文件中添加或修改以下配置：
+*  soft  nofile  32768
+*  hard  nofile  65536
+配置的硬限制是实际的限制，而软限制是warnning限制，只会做出warning。
+ 
+11	设计样例
