@@ -1,5 +1,5 @@
-sudo安全配置规范
-
+sudo安全配置规范-对于sudo是否存在越权问题的排查可以使用自动化工具进行排查
+https://github.com/jidongdeatao/LinuxTest/blob/master/NewVerson/SecurityTest/TestCase/SudoersSafe/TestCase_SudoerSafe.py
 
 
 目录
