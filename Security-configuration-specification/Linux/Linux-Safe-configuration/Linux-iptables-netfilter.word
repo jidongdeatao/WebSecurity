@@ -1,0 +1,188 @@
+1	Iptables简介
+    1.1	为什么要配置主机防火墙
+    防火墙作为一种网络或系统之间强制实行访问控制的机制，是确保网络安全的重要手段。针对不同的需求和应用环境，可以量身定制出不同的防火墙系统。防火墙大到可由若干路由器和堡垒主机构成，也可小到仅仅是网络操作系统上一个防火墙软件包所提供的包过滤功能。 
+    防火墙系统可分为包过滤型、应用级网关（也叫代理服务器型防火墙）和电路级网关三种基本类型。Linux提供的防火墙软件包内置于Linux内核中，是一种基于包过滤型的防火墙实现技术。其中心思想是根据网络层IP包头中的源地址、目的地址及包类型等信息来控制包的流向。更彻底的过滤则是检查包中的源端口、目的端口以及连接状态等信息。
+    对于连接到网络上的 Linux 系统来说，防火墙是必不可少的防御机制，它只允许合法的网络流量进出系统，而禁止其它任何网络流量，例如只限定允许的IP地址访问其SSH服务。因而，可以定制防火墙配置来满足任何特定需求和任何安全性级别需求
+    Linux内核从1.1版本开始，就已经具备包过滤功能。在2.0内核中，开始采用Ipfwadm来操作内核的包过滤规则。到2.2版本时，Linux内核采用了Ipchains来控制内核的包过滤规则。发展到2.4.x时，Ipchains被一个全新的包过滤管理工具Iptables所替代。新发布的2.6版内核也在安全方面进行了改进。因此，无论拥有哪个版本的Linux内核，无论选择哪个版本的Linux来构建自己的企业网，都可以利用现有的系统构建出一个理想实用的防火墙。 
+    1.2	netfilter/iptables系统是如何工作的？
+    1.2.1	Netfilter 
+      Linux 内核2.4 版本中集成了NetFilter框架，该框架是Linux平台新的网络安全功能框架，实现了多种网络安全功能：数据包过滤、状态保持、NAT，以及抗攻击等等。我们常用的Iptables，仅仅是NetFilter框架在用户空间的配置工具，负责从用户命令行界面接收命令，然后转化成内核认识的结构体，调用相应的内核操作函数，将规则插入到内核中去。
+      NetFilter和Iptables，不是两个独立的东西，它们一个是内核空间的实现模块，称作NetFilter，一个是用户空间的控制命令解析器，称作Iptables。两者结合才能完成整体的工作。
+      要使用Iptables，必须在编译Linux内核的时候（内核的版本必须大于2.4）选择与NetFilter相关的内核模块，否则即使安装了Iptables，也不能使用。一般发行版中都在内核中已经把相关模块编译进去了，iptables也安装好了，所以可以直接调用iptables进行配置。
+    1.2.2	Iptables
+      Linux根据数据包在内核中的不同处理，将整个IP包在内核中的生存周期划分为三个：PREROUTING、FORWARD、POSTROUTING。其他还有两个LOCAL_INPUT和LOCAL_OUTPUT（一般简写成INPUT和OUTPUT），分别对应送入本机上层协议栈的数据包和本机发送出的数据包。如果想要保护本机的安全性，那么只需关注INPUT和OUTPUT方向的数据包就可以了。其他几个不需要关心。
+      这五个方向对应着内核中五条不同的规则链和三个不同的规则表。
+      Linux中规则链被组织在三个不同的规则表中:Filter 、NAT、Mangle。其中Filter针对过滤系统，NAT针对地址转换系统，Mangle针对策略路由和特殊应用。规则链分配如下：
+    	Filter：INPUT、FORWARD、OUTPUT
+    	NAT：PREROUTING、POSTROUTING
+    	Mangle：PREROUTING、POSTROUTING
+    在内核编译了NetFilter系统以后，系统会自动建立这五个规则链和三个规则表。
+      我们在使用的时候主要要使用到的规则表是Filter表，规则链是INPUT和OUTPUT链。添加的主要规则都集中在这两个链上。用图示表示如下：
+
+    图1 信息包过滤过程
+      系统缺省的表为filter，该表包含了INPUT链（输入链）、FORWARD链（转发链）和OUTPUT链（输出链）。每一条链中可以定义一条或数条规则，每一条规则都以如下格式定义：
+      条件/处理方式。 
+      当一个数据包到达一个链时，系统就会从第一条规则开始检查，看是否符合该规则所定义的条件。如果满足，系统将根据该条规则所定义的方法处理该数据包；如果不满足，则继续检查下一条规则。如果该数据包不符合该链中任一条规则，系统则会根据该链预先定义的策略（policy）来处理该数据包。 
+    针对主机的安全性主要集中在Filter表中的INPUT和OUTPUT规则链，这两个关键字在添加规则的时候会使用到。
+
+2	Iptables配置
+	  针对Linux绝大多数发行版，如SUSE 9.0/10.0由于已经在内核中编译好了NetFilter，并安装好Iptables配置工具，所以我们重点介绍如何配置iptables来保护我们的系统。如需要进行手工安装，请参考3.1 附录1。
+2.1	Iptables基本指令
+    Iptables基本语法如下，可以在命令行下直接执行
+    iptables [-t table] command [match] [-j target/jump]
+    详细命令请参考3.2节 附录2。
+2.2	配置实例
+    在防火墙配置中，最明智的办法是阻挡所有东西，然后对需要的开启。这通常称为“凡是没有明确允许的都是禁止的”。如果非常关心系统安全，并明确知道需要的服务，建议这样做。
+    强调一点是不要运行任何不需要的服务，即使你认为你已经阻挡了对它们的访问。 
+    下面所有例子均采用命令的方式,只在当时生效,如果想要重起后也起作用,那就要保存到相应文件，参考2.3.4章节进行保存。
+2.2.1	清除原有规则 
+    首先参考配置注意事项把系统自带的防火墙关闭。然后清除现在filter的所有规则，配置一个全新的防火墙规则。
+    [root@tp ~]# iptables -F 
+    清除预设表filter中的所有规则链的规则 
+    [root@tp ~]# iptables -X 
+    清除预设表filter中使用者自定链中的规则 
+    看一下现在的规则： 
+    [root@tp ~]# iptables -L -n 
+    Chain INPUT (policy ACCEPT) 
+    target prot opt source destination 
+    Chain FORWARD (policy ACCEPT) 
+    target prot opt source destination 
+    Chain OUTPUT (policy ACCEPT) 
+    target prot opt source destination 
+    现在IPTABLES配置表里什么配置都没有了,可以开始自己的配置了。 
+2.2.2	设定预设规则 
+    注意:如果你是远程SSH登陆的话，最好先看完下面的设置，考虑周全后再进行设置，否则，当你输入下面第一个命令回车的时候就应该掉线了，因为你没有设置任何规则。
+    [root@tp ~]# iptables -p INPUT DROP 
+    [root@tp ~]# iptables -p OUTPUT ACCEPT 
+    [root@tp ~]# iptables -p FORWARD DROP 
+    预设规则也就是默认规则，上面的意思是,当超出了IPTABLES里filter表里的两个链INPUT,FORWARD)时,数据包将被被(放弃)DROP掉。相当于默认情况下进入系统的包和经过系统转发的包是不允许的。
+    而对于OUTPUT链,也就是从系统向外发的包我们不做太多限制,而是采取ACCEPT,也就是说,不在这个规则链里的包默认通过。 
+    而后面的事情，就是增加特殊情况，即在INPUT,FORWARD两个链中添加允许什么包通过,而OUTPUT链采用的是不允许什么包通过。这里我们主要考虑INPUT链和OUTPUT链的规则。 
+2.2.3	添加规则
+	INPUT链规则
+首先添加INPUT链,INPUT链的默认规则是DROP,所以我们就写需要ACCETP(通过)的链。
+（1）开放服务
+如我们需要开放SSH服务，能够采用远程SSH登陆,我们要开启22端口. 
+[root@tp ~]# iptables -A INPUT -p tcp --dport 22 -j ACCEPT 
+如果做了FTP服务器,开启21端口，另外还需要开放数据端口20。
+[root@tp ~]# iptables -A INPUT -p tcp --dport 21 -j ACCEPT 
+[root@tp ~]# iptables -A INPUT -p tcp --dport 20 -j ACCEPT 
+如果你还做了其他的服务器,需要开启哪个端口,照写就行了. 
+（2）开放协议 
+如需要其他机器ping通本机，即允许icmp包通过,也就是允许ping：
+[root@tp ~]# iptables -A INPUT -p icmp -j ACCEPT 
+（3）限制某些IP访问
+如我们只允许192.168.1.3的机器进行SSH连接到本机：
+[root@tp ~]# iptables -A INPUT -s 192.168.1.3 -p tcp --dport 22 -j ACCEPT 
+如果要允许或限制一段IP地址可用 192.168.1.0/24 表示，24表示子网掩码数，指192.168.1.1-255一段的所有IP。!192.168.1.3 表示除了192.168.0.3的ip地址。
+ 上面主要写的都是INPUT链,凡是不在上面的规则里的,都DROP
+	OUTPUT链规则
+下面写OUTPUT链,OUTPUT链默认规则是ACCEPT,所以我们就写需要DROP(放弃)的链。
+如减少不安全的端口连接：
+[root@tp ~]# iptables -A OUTPUT -p tcp --sport 31337 -j DROP 
+[root@tp ~]# iptables -A OUTPUT -p tcp --dport 31337 -j DROP 
+当然出入更安全的考虑你也可以包OUTPUT链设置成DROP,那么添加的规则就多一些,就像上边INPUT链一样，需要开放什么，就要设置什么样的规则：
+[root@tp ~]# iptables -A OUTPUT -p tcp --sport 22 -j ACCEPT 
+允许远程用户连接SSH服务。
+[root@tp ~]# iptables -A OUTPUT -p tcp --sport 80 -j ACCEPT
+允许访问80端口。 
+[root@tp ~]# iptables -A OUTPUT -p icmp -j ACCEPT 
+允许远程用户ping本机。
+2.2.4	删除规则
+如果发现配置错误，需要删除某条规则，用下面命令:
+[root@tp ~]# iptables -D INPUT -p tcp --dport 22 -j ACCEPT 
+再次强调，凡是采用命令的方式，只在当时生效,如果想要重起后也起作用,那就要保存到文件。
+2.2.5	保存规则
+查看现有的规则：
+[root@tp ~]# iptables -L –n
+上面说明了如何建立基本的规则和链接以及如何从数据包过滤表中添加或删除它们。但是：用上述方法所建立的规则会被保存到内核中，但当重新引导系统时，会丢失这些规则。所以，如果您将没有错误的且有效的规则集添加到信息包过滤表，同时希望在重新引导之后再次使用这些规则，那么必须将该规则集保存在文件中。可以使用 iptables-save命令来做到这一点，检查规则没有问题后，进行保存。
+[root@tp ~]#iptables-save > /PATH/iptables-script
+PATH为具体路径。
+2.2.6	恢复规则
+现在，数据包过滤表中的所有规则都被保存在文件 iptables-script 中。无论何时再次引导系统，都可以使用 iptables-restore命令将规则集从该脚本文件恢复到信息包过滤表，如下所示： 
+[root@tp ~]#iptables-restore iptables-script 
+另外如果要在每次引导系统时自动恢复该规则集，则可以将上面指定的这条命令放到任何一个初始化shell 脚本中。在/etc/rc.d/rc3.d中新建一个S*开头的脚本，*为一个数字，内容如下：
+#!/bin/bash
+iptables-restore /PATH/iptables-script
+PATH为具体的路径名。
+2.2.7	配置注意事项
+上面只是举了一些简单的实例，其他的规则链接也同样设置。具体设置需要根据每个系统进行不同定制。下面是一些在配置过程中注意的事项。
+1、	如果使用自己定义的iptables规则文件，确保关闭Suse Linux自带的防火墙
+由于Suse Linux自带yast管理工具，可以利用yast配置管理防火墙，但其提供的外置接口比较简单，很多功能无法实现，如果同时使用两种配置会造成冲突。建议如果不想使用默认的防火墙，把防火墙进行关闭。
+	方法1：直接/etc/rc.d/rc3.d和/etc/rc.d/rc5.d下的S*SuSEfirewall2_init，S*SuSEfirewall2_setup，S*SuSEfirewall2_final三个文件。
+	方法2：运行yast，选择Security and UsersFirewall，然后选择Stop Firewall and Remove from Boot Proces，然后Next，关闭防火墙。
+2、	配置iptables规则时注意大小写
+由于Linux是区分大小写的，所以要注意规则中大小写的区别。
+3	附录
+3.1	附录1 iptables安装
+	Linux 2.4 以后的版本默认已经配置了netfilter，这里就不介绍如何进行编译内核了，只介绍一下如何安装用户空间程序iptables。
+	首先到官方网站下载源代码：http://www.netfilter.org/，然后进行安装。 
+[root@tp ~]#bzip2 -d iptables-x.x.x.tar.bz2
+[root@tp ~]#tar -xvf  iptables-x.x.x.tar
+[root@tp ~]#cd iptables-x.x.x
+[root@tp ~]#make KERNEL_DIR=/usr/src/linux/
+[root@tp ~]#make install KERNEL_DIR=/usr/src/linux/
+
+3.2	附录2 iptables命令详细使用说明
+Iptables基本语法如下：
+iptables [-t table] command [match] [-j target/jump]
+-t 参数用来指定规则表，内建的规则表有三个，分别是：nat、mangle 和 filter，当未指定规则表时，则一律视为是 filter。filter 这个规则表是预设规则表，拥有 INPUT、FORWARD 和 OUTPUT 三个规则链，这个规则表顾名思义是用来进行数据包过滤的处理动作（例如：DROP、 LOG、 ACCEPT 或 REJECT），我们会将基本规则都建立在此规则表中。
+下面是使用到的基本命令，主要是filter表中用到的，nat和mangle表在这里不做详细说明。可以使用man iptables查找更详细的信息。
+命令（command）	范例	说明
+-A, --append	iptables -A INPUT ...	新增规则到某个规则链中，该规则将会成为规则链中的最后一条规则。
+-D, --delete	iptables -D INPUT --dport 80 -j DROP
+iptables -D INPUT 1	从某个规则链中删除一条规则，可以输入完整规则，或直接指定规则编号加以删除。
+-R, --replace	iptables -R INPUT 1 -s 192.168.0.1 -j DROP	取代现行规则，规则被取代后并不会改变顺序。
+-I, --insert	iptables -I INPUT 1 --dport 80 -j ACCEPT	插入一条规则，原本该位置上的规则将会往后移动一个顺位。
+-L, --list	iptables -L INPUT	列出某规则链中的所有规则。
+-F, --flush	iptables -F INPUT	删除某规则链中的所有规则。
+-Z, --zero	iptables -Z INPUT	将数据包计数器归零。数据包计数器是用来计算同一数据包出现次数，是过滤阻断式攻击不可或缺的工具。
+-N, --new-chain	iptables -N allowed	定义新的规则链
+-X, --delete-chain	iptables -X allowed	删除某个规则链。
+-P, --policy	iptables -P INPUT DROP	定义过滤政策。 也就是未符合过滤条件的数据包，默认的处理方式。
+-E, --rename-chain	iptables -E allowed disallowed	修改某自定义规则链的名称。
+
+匹配（match）	范例	说明
+-p, --protocol	iptables -A INPUT -p tcp	比对通讯协议类型是否相符，可以使用 ! 运算进行反向比对，例如：-p ! tcp ，意思是指除 tcp 以外的其它类型，包含udp、icmp ...等。如果要比对所有类型，则可以使用 all 关键词，例如：-p all。
+-s, --src, --source	iptables -A INPUT -s 192.168.1.1	用来比对数据包的来源 IP，可以比对单机或网络，比对网络时请用数字来表示掩码，例如：-s 192.168.0.0/24，比对 IP 时可以使用 ! 运算进行反向比对，例如：-s ! 192.168.0.0/24。
+-d, --dst, --destination	iptables -A INPUT -d 192.168.1.1	用来比对数据包的目的地 IP，设定方式同上。
+-i, --in-interface	iptables -A INPUT -i eth0	用来比对数据包是从哪块网卡进入，可以使用通配字符 + 来做大范围比对，例如：-i eth+ 表示所有的 ethernet 网卡，也可以使用 ! 运算符进行反向比对，例如：-i ! eth0。
+-o, --out-interface	iptables -A FORWARD -o eth0	用来比对数据包要从哪块网卡送出，设定方式同上。
+--sport, --source-port	iptables -A INPUT -p tcp --sport 22	用来比对数据包的源端口，可以比对单一端口，或是一个范围，例如：--sport 22:80，表示从 22 到 80 端口之间都算是符合条件，如果要比对不连续的多个端口，则必须使用 --multiport 参数，详见后文。比对端口号时，可以使用 ! 运算符进行反向比对。
+--dport, --destination-port	iptables -A INPUT -p tcp --dport 22	用来比对数据包的目的端口号，设定方式同上。
+--tcp-flags	iptables -p tcp --tcp-flags SYN,FIN,ACK SYN	比对 TCP 数据包的状态标志，参数分为两个部分，第一个部分列举出想比对的状态标志，第二部分则列举前述状态标志中哪些有被设，未被列举的标志必须是空的。TCP 状态旗号包括：SYN（同步）、ACK（应答）、FIN（结束）、RST（重设）、URG（紧急）、PSH（强迫推送） 等，均可使用于参数中，除此之外还可以使用关键词 ALL 和 NONE 进行比对。比对标志时，可以使用 ! 运算符进行行反向比对。
+--syn	iptables -p tcp --syn	用来比对是否为要求连接之 TCP 数据包，与 iptables -p tcp --tcp-flags SYN,FIN,ACK SYN 的作用完全相同，如果使用 !运算符，可用来比对非要求连接数据包。
+-m multiport --source-port	iptables -A INPUT -p tcp -m multiport --source-port 22,53,80,110	用来比对不连续的多个源端口号，一次最多可以比对 15 个端口，可以使用 ! 运算符进行反向比对。
+-m multiport --destination-port	iptables -A INPUT -p tcp -m multiport --destination-port 22,53,80,110	用来比对不连续的多个目的端口号，设定方式同上。
+-m multiport --port	iptables -A INPUT -p tcp -m multiport --port 22,53,80,110	这个参数比较特殊，用来比对来源端口号和目的端口号相同的数据包，设定方式同上。注意：在本范例中，如果来源端口号为 80 
+目的地端口号为 110，这种数据包并不算符合条件。
+--icmp-type	iptables -A INPUT -p icmp --icmp-type 8	用来比对 ICMP 的类型编号，可以使用代码或数字编号来进行比对。可用 iptables -p icmp --help 来查看有哪些代码可用。
+-m limit --limit	iptables -A INPUT -m limit --limit 3/hour	用来比对某段时间内数据包的平均流量，例子是用来比对每小时平均流量是否超过一次 3 个数据包。 除了每小时平均次外，也可以每秒钟、每分钟或每天平均一次，默认值为每小时平均一次，参数如后： /second、 /minute、/day。 除了进行数据包数量的比对外，设定这个参数也会在条件达成时，暂停数据包的比对动作，以避免因黑客使用洪水攻击法，导致服务被阻断。
+-m limit --limit-burst	iptables -A INPUT -m limit --limit-burst 5	用来比对瞬间大量数据包的数量，例子是用来比对一次同时涌入的数据包是否超过 5 个（这是默认值），超过此上限的数据包将被直接丢弃。使用效果同上。
+-m mac --mac-source	iptables -A INPUT -m mac --mac-source 00:00:00:00:00:01	用来比对数据包来源网络接口的硬件地址，这个参数不能用在 OUTPUT 和 Postrouting 规则链上，这是因为数据包要送出到网后，才能由网卡驱动程序透过 ARP 通讯协议查出目的地的 MAC 地址，所以 iptables 在进行数据包比对时，并不知道数据包会送到哪个网络接口去。
+-m mark --mark	iptables -t mangle -A INPUT -m mark --mark 1	用来比对数据包是否被表示某个号码，当数据包被比对成功时，我们可以透过 MARK 处理动作，将该数据包标示一个号码，号码最大不可以超过 4294967296。
+-m owner --uid-owner	iptables -A OUTPUT -m owner --uid-owner 500	用来比对来自本机的数据包是否为某特定使用者所产生的，这样可以避免服务器使用 root 或其它身分将敏感数据传送出去，可以降低系统被攻击的损失。可惜这个功能无法比对出来自其它主机的数据包。
+-m owner --gid-owner	iptables -A OUTPUT -m owner --gid-owner 0	用来比对来自本机的数据包，是否为某特定使用者群组所产生的，使用时机同上。
+-m owner --pid-owner	iptables -A OUTPUT -m owner --pid-owner 78	用来比对来自本机的数据包，是否为某特定行程所产生的，使用时机同上。
+-m owner --sid-owner	iptables -A OUTPUT -m owner --sid-owner 100	用来比对来自本机的数据包，是否为某特定连接（Session ID）的响应数据包，使用时机同上。
+-m state --state	iptables -A INPUT -m state --state RELATED,ESTABLISHED	用来比对连接状态，连接状态共有四种：INVALID、ESTABLISHED、NEW 和 RELATED。INVALID 表示该数据包的连接编号（Session ID）无法辨识或编号不正确。ESTABLISHED 表示该数据包属于某个已经建立的连接。NEW 表示该数据包想要起始一个连接（重设连接或将连接重定向）。RELATED 表示该数据包是属于某个已经建立的连接，所建立的新连接。例如：FTP-DATA 连接必定是源自某个 FTP 连接。
+
+常用的处理动作：-j 参数用来指定要进行的处理动作，常用的处理动作包括：ACCEPT、REJECT、DROP、REDIRECT、MASQUERADE、LOG、DNAT、SNAT、MIRROR、QUEUE、RETURN、MARK.
+参数	说明
+ACCEPT	将数据包放行，进行完此处理动作后，该数据包将不再比对其它规则，直接跳往下一个规则链。
+REJECT	拦截该数据包，并传送数据包通知对方，可以传送的数据包有几个选择：ICMP port-unreachable、ICMP echo-reply 或是 tcp-reset（这个数据包会要求对方关闭连接），进行完此处理动作后，该数据包将不再比对其它规则。 范例如下：
+iptables -A FORWARD -p TCP --dport 22 -j REJECT --reject-with tcp-reset
+DROP	丢弃数据包不予处理，进行完此处理动作后，该数据包将不再比对其它规则。
+REDIRECT	将数据包重新导向到另一个端口（PNAT），进行完此处理动作后，将会继续比对其它规则。 这个功能可以用来实现透明代理或用来保护 web 服务器。例如：iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-ports 8080
+MASQUERADE	改写数据包来源 IP 为防火墙 NIC IP，可以指定 port 对应的范围，进行完此处理动作后，直接跳往下一个规则（mangleostrouting）。这个功能与 SNAT 略有不同，当进行 IP 伪装时，不需指定要伪装成哪个 IP，IP 会从网卡直接读，当使用IP 是由 ISP 公司的 DHCP 服务器指派的时候，MASQUERADE 特别有用。范例如下：
+iptables -t nat -A POSTROUTING -p TCP -j MASQUERADE --to-ports 1024-31000
+LOG	将数据包相关讯息纪录在 /var/log 中，详细位置请查阅 /etc/syslog.conf 组态档，进行完此处理动作后，将会继续比对其规则。例如：
+iptables -A INPUT -p tcp -j LOG --log-prefix "INPUT packets"
+SNAT	改写数据包来源 IP 为某特定 IP 或 IP 范围，可以指定 port 对应的范围，进行完此处理动作后，将直接跳往下一个规则（mangleostrouting）。范例如下：iptables -t nat -A POSTROUTING -p tcp-o eth0 -j SNAT --to-source 194.236.50.155-194.236.50.160:1024-32000
+DNAT	改写数据包目的地 IP 为某特定 IP 或 IP 范围，可以指定 port 对应的范围，进行完此处理动作后，将会直接跳往下一个规炼（filter:input 或 filter:forward）。范例如下：
+iptables -t nat -A PREROUTING -p tcp -d 15.45.23.67 --dport 80 -j DNAT --to-destination 192.168.1.1-192.168.1.10:80-100
+MIRROR	镜射数据包，也就是将来源 IP 与目的地 IP 对调后，将数据包送回。
+QUEUE	将数据包放入队列，交给其它程序处理。透过自行开发的处理程序，可以进行其它应用，例如：连接计费.......等。
+RETURN	结束在目前规则链中的过滤程序，返回主规则链继续过滤，如果把自定义规则链看成是一个子程序，那么这个动作，就相当提早结束子程序并返回到主程序中。
+MARK	将数据包标上某个代号，以便提供作为后续过滤的条件判断依据，进行完此处理动作后，将会继续比对其它规则。范例如下：
+iptables -t mangle -A PREROUTING -p tcp --dport 22 -j MARK --set-mark 2
