@@ -1,3 +1,6 @@
+#转自https://github.com/FallibleInc/security-guide-for-developers/blob/master/https.md#the-problem
+
+Securely transporting stuff: HTTPS explained
 The problem
 
 HTTP is the protocol that the browsers use to communicate with the server. The problem with HTTP without any S is that it sends and receives data in plain text.
