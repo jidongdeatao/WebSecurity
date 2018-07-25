@@ -1,0 +1,26 @@
+sqlmap+burpsuite日志自动化测试
+
+    如果网站特别大，针对每个接口都用手工一个个测试效率低下且有可能造成遗漏。
+    结合burpsuite的爬虫爬取网站的所有API接口用sqlmap实现自动化测试sql注入漏洞。
+    但是，POST请求还是需要手工测试，是因为spider爬虫不熟悉业务流程，有些post请求无法爬取。
+    
+ 步骤1:配置burpsuite的日志功能
+    在burpsuite -> Useroptions -> Misc选项中，
+      勾选Logging中Spider的Request项，然后弹出一个框选择保存日志的路径及名称。
+      配置完成后就进入burpsuite的爬虫阶段。
+      
+ 步骤2:使用burpsuite爬虫爬取目标web。
+    不会的话参考文档。
+   
+ 步骤3:查看并筛选日志
+    爬取的request请求中可能存在许多html、css、js等静态页面，建议删掉提高sql注入测试效率。POST请求就手工测试了
+    
+ 步骤4:sqlmap读取burpsuite日志批量测试
+    sqlmap.py -I C:\日志文件 --batch -smart
+      参数说明：-I 读取文件列表中的请求做测试，后面加的是日志文件的路径
+              --batch 指不询问用户输入，使用默认配置
+              -smart 智能检测，提高效率
+ 
+ 步骤5:查看是否存在注入点
+    当自动化检测sql注入完成后将有sqlmap注入存在的点记录到sqlmap安装目录output下。
+    到其中进行查看分析
