@@ -20,11 +20,50 @@ SQL注入：
             关键字如下：
               PHP语言关键字：prepare 、execute
               JAVA语言关键字：PreparedStatement
-        
         2.分析代码
+          考虑到测试人员的代码水平不一，如果不确定可找开发帮忙定位分析。当通过关键字定位到具体代码段段时候，查看当前是否使用如下方式类型化SQL参数：
+            String selectStatement = “Select * From Uer where userId = ?";
+            PreparedStatement prepstmt = con.prepareStatement(selectStatement);
+            prepStmt setString(1,userId);
+            ResultSet rs = prepStmt.executeQuery();
         
-        
-          
+              
     2）黑盒测试：
       神器——sqlmap工具检测
+      sqlmap的安装这里不进行展开。
+      由于测试环境一般都需要登录认证，建议使用burpsuite截取包含认证cookie的报文进行SQL注入测试，截取整个request请求报文参数测试覆盖参数更加全面。
+      步骤1: 
+          使用burpsuite截取需要测试的request请求
+          然后将截取的request请求报文全部保存到一个txt文档中，如：inject.txt
+      步骤2:
+          检测目标API是否存在注入点。
+          通过执行命令：
+          sqlmap.py -r C;\inject.txt -b
+            参数说明：-r 表示读取本地文件，后面加上文件的路径
+                    -b 表示探测目标系统的数据库和操作系统的版本信息
+          如果中请求中发现sql注入点，结果会显示目标数据库及目标系统的版本信息。
+      步骤3:
+          探测目标数据库
+          通过执行命令：
+          sqlmap.py -r C;\inject.txt --dbs
+      步骤4:
+          探测目标数据库的tables信息
+          通过执行命令：
+          sqlmap.py -r C;\inject.txt -D XXX --tables
+            参数说明：-D 表示探测指定的数据库信息，后面加数据库名称
+                    --tables 表示探测数据库中的表信息
+      步骤5:
+          探测目标数据库的columns
+          通过执行命令：
+          sqlmap.py -r C;\inject.txt -D XXX -T YYY --columns
+            参数说明：-D 表示探测指定的数据库信息，后面加数据库名称
+                    -T 表示探测指定的table中的信息
+                    --columns 表示列出table中的columns信息
+      步骤6:
+          探测目标数据库的字段信息
+          通过执行命令：
+          sqlmap.py -r C;\inject.txt -D XXX -T YYY --columns -dump
+            参数说明：--dump 表示列出表中的字段信息      
       
+     
+      sqlmap+burpsuite自动化测试：参见文档sqlmap+burpsuite.txt
