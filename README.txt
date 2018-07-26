@@ -7,11 +7,6 @@ WEB安全分为四大模块：
      https://github.com/jidongdeatao/LinuxTest/tree/master/NewVerson/SecurityTest/TestCase/systemSafe
         检查功能项包括：
         1.所有非root用户的文件权限：
-        1）含有敏感信息的文件不得大于600（rw------）对于多个OS用户都需要访问敏感文件的场景都不得大于640（rw-r-----），如：数据库备份恢复
-        2）日志文件不得大于640（rw-r-----）
-        3）不可执行文件不得大于640（rw-r-----）
-        4）可执行文件不得大于750（rwxr-x---）
-        5）目录不得大于750（rwxr-x---），有时候目录要求不能大于700（rwx------）"
         2.检查系统中不能安装调试工具：make|gcc|gcc-c++|cpp|gdb|binutils|glibc_devel|flex|tcpdump|mirror|glibc-devel|dexdump|toolbox|Netcat|Wireshark|ethereal
         3.检查系统中的无属主文件
         4.检查进程越权，产品进程是否用root账号启动
