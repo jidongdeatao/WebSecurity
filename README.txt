@@ -16,6 +16,11 @@ WEB安全分为四大模块：
         8.检查系统账号的的密码加密安全（比如不能用Base64加密）
         9.运行数据库进程的帐号权限应该遵循最小权限原则，要使用操作系统的非管理员权限帐号来运行数据库
         10.检查是否安装了不安全的服务
+        
+     Linux sudo越权自动化脚本：
+     sudo安全配置规范-对于sudo是否存在越权问题的排查可以使用自动化工具进行排查
+    https://github.com/jidongdeatao/LinuxTest/blob/master/NewVerson/SecurityTest/TestCase/SudoersSafe/TestCase_SudoerSafe.py
+
      
   二、数据库安全（常见企业数据库为MySQL、Redis）
      这部分安全规范 已归纳到GitHub：https://github.com/jidongdeatao/Database/tree/master/DatabaseSafty
