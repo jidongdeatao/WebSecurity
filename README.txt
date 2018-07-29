@@ -36,6 +36,8 @@ WEB安全分为四大模块：
       SQL Inject
       XXE
       SSRF
+      DDOS
+      
       
   
      
