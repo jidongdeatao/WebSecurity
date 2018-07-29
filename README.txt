@@ -31,6 +31,11 @@ WEB安全分为四大模块：
   
   
   四、WEB应用安全
-  
+      XSS
+      CSRF
+      SQL Inject
+      XXE
+      SSRF
+      
   
      
