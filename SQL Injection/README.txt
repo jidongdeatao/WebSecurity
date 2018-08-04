@@ -1,5 +1,11 @@
 SQL Injection
 
+最常见的检测SQL注入的方法是通过在输入处添加一个单引号(&#039;)并且期待（系统）返回一个错误，有些应用程序并不会返回错误。这个时候我们就会利用true/false语句来检查是否这个应用程序会受到SQL注入的攻击。
+
+为了随机的找到还有SQL注入的脆弱性的网站，你能够使用如下格式的语句利用google dork：inurl:news.php id =1?将会出现一堆google dork的数据并且为你过滤你搜索得到的结果提供了可能。
+google dork的列表：
+https://github.com/jidongdeatao/Security-Tools-List/tree/master/Google%20Hacking
+
 SQL注入：
   测试思路：
     1）白盒测试：
