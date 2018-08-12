@@ -39,7 +39,7 @@ WEB安全分为四大模块：
       DDOS
       点击劫持ClickJacking
       密码暴力破解
-      命令执行漏洞
+      Command Injection命令注入漏洞
       文件包含漏洞
       文件上传漏洞
       业务逻辑漏洞：
