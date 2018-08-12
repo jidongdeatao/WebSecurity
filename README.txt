@@ -34,14 +34,14 @@ WEB安全分为四大模块：
       XSS
       CSRF
       SQL Injection
-      Command Injection（命令注入）
-      File Inclusion（文件包含漏洞）
+      Command Injection(命令注入）
+      File Inclusion(文件包含漏洞）
+      File Upload(文件上传漏洞)
       XXE
       SSRF
       DDOS
       点击劫持ClickJacking
       密码暴力破解
-      文件上传漏洞
       业务逻辑漏洞：
         1）密码重置漏洞
         2）认证：（Cookie与Session、Outh2.0）
