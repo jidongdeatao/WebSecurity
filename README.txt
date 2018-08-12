@@ -33,14 +33,18 @@ WEB安全分为四大模块：
   四、WEB应用安全
       XSS
       CSRF
-      SQL Inject
+      SQL Injection
+      Command Injection（命令注入）
       XXE
       SSRF
       DDOS
       点击劫持ClickJacking
       密码暴力破解
-      Command Injection命令注入漏洞
-      文件包含漏洞
+      File Inclusion（文件包含漏洞），是指当服务器开启allow_url_include选项时，
+就可以通过php的某些特性函数（include()，require()和include_once()，require_once()）利用url去动态包含文件，
+此时如果没有对文件来源进行严格审查，就会导致任意文件读取或者任意命令执行。
+文件包含漏洞分为本地文件包含漏洞与远程文件包含漏洞，
+远程文件包含漏洞是因为开启了php配置中的allow_url_fopen选项（选项开启之后，服务器允许包含一个远程的文件）。
       文件上传漏洞
       业务逻辑漏洞：
         1）密码重置漏洞
