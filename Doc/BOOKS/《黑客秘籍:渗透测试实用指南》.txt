@@ -1,0 +1,185 @@
+目录
+第1 章 赛前准备—安装 . 1
+1.1 建立测试环境 . 1
+1.2 建立一个域 . 1
+1.3 建立其他的服务器 . 2
+1.4 实践 . 2
+1.5 构建渗透测试环境 . 3
+1.5.1 安装一个渗透测试环境 . 3
+1.5.2 硬件 . 4
+1.5.3 开源软件和商业软件 . 5
+1.5.4 建立平台 . 6
+1.5.5 搭建Kali Linux . 8
+1.5.6 Windows 虚拟机 . 17
+1.5.7 设置Windows 环境  18
+1.5.8 启动PowerShell  20
+1.5.9 Easy-P  22
+1.6 学习 . 24
+1.6.1 Metasploitable 2 . 24
+1.6.2 二进制利用 . 26
+1.7 总结 . 36
+第2 章 发球前—扫描网络 . 37
+2.1 被动信息搜索—开源情报（OSINT）  37
+2.1.1 Recon-NG（Recon-NG（https://bitbucket.org/LaNMaSteR53/recon-ng,Kali Linux）  38
+2.1.2 Discover 脚本（脚本（https://github.com/leebaird/discover, Kali Linux）. 42
+2.1.3 SpiderFoot（http://www.spiderfoot.net/, Kali Linux）  44
+2.2 创建密码字典 . 46
+2.2.1 Wordhound（Wordhound（https://bitbucket.org/mattinfosec/wordhound.git,
+Kali Linux）  46
+2.2.2 BruteScrape（BruteScrape（https://github.com/cheetz/brutescrape, Kali Linux）  50
+2.2.3 使用攻陷密码列表来查找邮件地址和凭证  51
+2.2.4 Gitrob–Github 分析(分析(https://github.com/michenriksen/gitrob,
+Kali Linux). 54
+2.2.5 开源情报数据搜集 . 56
+2.3 外部或内部主动式信息搜集 . 57
+2.3.1 Masscan(Masscan(https://github.com/robertdavidgraham/masscan, Kali Linux)  57
+2.3.2 SPARTA（http://sparta.secforce.com/, Kali Linux） . 60
+2.3.3 HTTP Screenshot（Screenshot（https://github.com/breenmachine/httpscreenshot,
+Kali Linux）  63
+2.4 漏洞扫描 . 67
+2.4.1 Rapid7 Nexpose/Tenable Nessus（Kali/Windows/OS X）  67
+2.4.2 OpenVAS(http://www.openvas.org/, Kali)  68
+2.5 网站应用程序扫描 . 71
+2.5.1 网站扫描过程 . 71
+2.5.2 网站应用程序扫描 . 72
+2.5.3 OWASP Zap Proxy(Proxy(https://code.google.com/p/zaproxy/,
+Kali Linux/Windows/OS X)  79
+2.6 分析Nessus、Nmap 和Burp . 81
+2.7 总结 . 83
+第3 章 带球—漏洞利用 . 85
+3.1 Metasploit(http://www.metasploit.com, Windows/Kali Linux). 85
+3.1.1 从Kali 操作系统的终端—初始化和启动Metasploit 工具  86
+3.1.2 使用通用配置命令运行Metasploit . 86
+3.1.3 运行Metasploit—漏洞利用后续操作或其他 . 87
+3.1.4 使用Metasploit 平台利用MS08-067 漏洞 . 87
+3.2 脚本 . 89
+3.3 打印机 . 90
+3.4 心脏出血 . 94
+3.5 Shellshock . 97
+3.6 导出Git 代码库（Kali Linux） . 101
+3.7 Nosqlmap (www.nosqlmap.net/, Kali Linux)  103
+3.8 弹性搜索（Kali Linux）  106
+3.9 总结 . 108
+第4 章 抛传—网站应用程序的人工检测技术 . 109
+4.1 网站应用程序渗透测试 110
+4.1.1 SQL 注入  111
+4.1.2 手工SQL 注入 .115
+4.1.3 跨站脚本（XSS）  131
+4.1.4 跨站请求伪造（CSRF）  136
+4.1.5 会话令牌 . 139
+4.1.6 其他模糊测试/输入验证  141
+4.1.7 其他OWASP 前十大漏洞  144
+4.1.8 功能/业务逻辑测试  146
+4.2 总结 . 147
+第5 章 横传—渗透内网 . 149
+5.1 无凭证条件下的网络渗透 . 149
+5.1.1 Responder.py ((https://github.com/SpiderLabs/Responder, Kali Linux)  149
+5.1.2 ARP 欺骗  153
+5.1.3 Cain and Abel (http://www.oxid.it/cain.html, Windows) . 154
+5.1.4 Ettercap(http://ettercap.github.io/ettercap/, Kali Linux)  156
+5.1.5 后门工厂代理(后门工厂代理(https://github.com/secretsquirrel/ BDFProxy,
+Kali Linux). 157
+5.1.6 ARP 欺骗后攻击操作 . 159
+5.2 利用任意域凭证（非管理员权限） . 167
+5.2.1 开展系统侦察 . 167
+5.2.2 组策略首选项 . 173
+5.2.3 关于漏洞利用后期的一点提示 . 175
+5.2.4 权限提升 . 176
+5.3 拥有本地管理员权限或域管理员权限 . 181
+5.3.1 使用凭证和psexec 渗透整个网络 . 182
+5.3.2 使用psexec 工具实现在多主机执行命令（Kali Linux） . 185
+5.3.3 使用WMI 工具进行横向渗透（Windows）  186
+5.3.4 Kerberos - MS14-068  188
+5.3.5 传递票据攻击 . 190
+5.3.6 利用PostgreSQL 漏洞进行横向渗透  192
+5.3.7 获取缓存证书 . 195
+5.4 攻击域控制器 . 197
+5.4.1 SMBExec(SMBExec(https://github.com/brav0hax/smbexec, Kali Linux) . 197
+5.4.2 psexec_ntdsgrab（Kali Linux） . 199
+5.5 持续控制 . 201
+5.5.1 Veil 和PowerShell  201
+5.5.2 使用计划任务实现持续控制 . 204
+5.5.3 金票据 . 206
+5.5.4 万能密钥 . 213
+5.5.5 粘滞键 . 215
+5.6 总结 . 218
+第6 章 助攻—社会工程学 . 219
+6.1 近似域名 . 219
+6.1.1 SMTP 攻击  219
+6.1.2 SSH 攻击 . 220
+6.2 网络钓鱼 . 222
+6.3 网络钓鱼报告 . 231
+第7 章 短传—物理访问攻击 . 233
+7.1 无线网络渗透 . 233
+7.1.1 被动识别和侦察 . 233
+7.1.2 主动攻击 . 235
+7.2 工卡克隆 . 245
+7.3 Kon-boot(http://www.piotrbania. com/all/kon- boot/, Windows/OS X) . 249
+7.3.1 Windows  250
+7.3.2 OS X  250
+7.4 渗透测试便携设备—Raspberry Pi 2 251
+7.5 Rubber Ducky (http://hakshop.myshopify.com/ products/usb-rubber- duckydeluxe)
+. 255
+7.6 总结 . 258
+第8 章 四分卫突破—规避杀毒软件检测 . 259
+8.1 规避杀毒软件检测 . 259
+8.1.1 后门工厂 ((https://github.com/secretsquirrel/the- backdoorfactory,
+Kali Linux). 259
+8.1.2 WCE 规避杀毒软件检测（Windows）  263
+8.1.3 Veil ((https://github.com/Veil-Framework, Kali Linux)  267
+8.1.4 SMBExec ((https://github.com/pentestgeek/smbexec, Kali Linux) . 270
+8.1.5 peCloak.py(http://www.securitysift.com/pecloak-py-an- experiment-inav-
+evasion/, Windows). 272
+8.1.6 Python  274
+8.2 其他键盘记录工具 . 276
+8.2.1 使用Nishang 下的键盘记录工具 ((https://github.com/ samratashok/
+nishang) . 277
+8.2.2 使用PowerSploit 工具中的键盘记录（工具中的键盘记录（https://github.com/ mattifestation/
+PowerSploit）  278
+8.3 总结 . 278
+第9 章 特勤组—破解、利用和技巧 . 279
+9.1 密码破解 . 279
+9.1.1 John the Ripper(http://www.openwall.com/john/, Windows/Kali
+Linux/OS X)  282
+9.1.2 oclHashcat (http://hashcat.net/oclhashcat/, Windows/Kali Linux)  283
+9.2 漏洞搜索 . 296
+9.2.1 searchsploit (Kali Linux) . 296
+9.2.2 BugTraq (http://www.securityfocus.com/bid) . 298
+9.2.3 Exploit-DB (http://www.exploit-db.com/) . 298
+9.2.4 查询Metasploit . 299
+9.3 一些小技巧 . 300
+9.3.1 Metasploit 的RC 脚本  300
+9.3.2 Windows 嗅探 . 301
+9.3.3 绕过UAC  302
+9.3.4 Kali Linux NetHunter  304
+9.3.5 生成一个定制反向shell . 306
+9.3.6 规避应用级防火墙 311
+9.3.7 PowerShell . 314
+9.3.8 Windows 7/8 上传文件到主机 . 315
+9.3.9 中转 . 316
+9.4 商业软件 . 323
+9.4.1 Cobalt Strike  324
+9.4.2 Immunity Canvas (http://www.immunityinc.com/products/canvas/, Kali Linux/
+OS X/Windows) . 328
+9.4.3 Core Impact (http://www.coresecurity.com/core-impact-pro) . 331
+第10 章 两分钟的操练—从零变成英雄  333
+10.1 十码线 . 333
+10.2 二十码线 . 334
+10.3 三十码线 . 334
+10.4 五十码线 . 335
+10.5 七十码线 . 337
+10.6 八十码线 . 339
+10.7 终点线 . 340
+10.8 达阵！达阵！达阵！ . 342
+第11 章 赛后—分析报告 . 345
+第12 章 继续教育 . 349
+12.1 漏洞悬赏网站 . 349
+12.2 主要的安全会议 . 349
+12.3 培训课程 . 351
+12.4 免费培训 . 351
+12.5 夺旗挑战 . 352
+12.6 保持更新 . 352
+12.6.1 邮件列表 . 352
+12.6.2 播客 . 352
+12.7 跟坏小子学习 . 353
+最后的注意事项 . 355
