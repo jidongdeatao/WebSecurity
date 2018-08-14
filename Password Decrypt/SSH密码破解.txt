@@ -1,6 +1,14 @@
 SSH密码破解工具来自于：
   工具传送门为：https://github.com/scu-igroup/ssh-scanner
   脚本为hydra.sh
+  简介
+  将nmap扫描器和hydra扫描器组合使用，先用nmap探测主机是否开放22端口；如开放，然后用hydra暴力破解ssh服务的密码。这里给出了top 100,1000,10000的常用密码本。
+  使用条件
+Ubuntu 18.04 64bit
+sudo apt install nmap hydra
+运行程序
+./hydra.sh -p ./password.txt -f ./iplist.txt #对文件中的IP进行破解
+./hydra.sh -p ./password.txt -l 192.168.9.0/24 #对网段中的IP进行破解
   原理：批量爆破SSH登录密码的流程其实很简单。首先探测对方主机是否开启22端口，如开启，则尝试进行SSH密码爆破。
   这里用到两款强大的开源工具。一个是nmap，用来探测22端口是否开启；另一个是hydra，用来爆破SSH登录密码。
   首先用nmap批量地扫描开放22端口的公网上的设备，运行命令如下：
