@@ -1,0 +1,7 @@
+一、利用工具Netcat
+适用于Windows、Linux等操作系统
+  
+  
+  
+  
+二、反向连接Python脚本
