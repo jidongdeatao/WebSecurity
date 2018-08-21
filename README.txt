@@ -31,6 +31,10 @@ WEB安全分为四大模块：
   
   
   四、WEB应用安全
+    1.浏览器安全策略
+      同源策略
+      
+    2.常见的WEB漏洞：
       XSS
       CSRF
       SQL Injection
