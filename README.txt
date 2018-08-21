@@ -35,17 +35,17 @@ WEB安全分为四大模块：
       同源策略
       
     2.常见的WEB漏洞：
-      XSS
-      CSRF
-      SQL Injection
-      Command Injection(命令注入）
-      File Inclusion(文件包含漏洞）
-      File Upload(文件上传漏洞)
+      XSS（Cross Site Script，跨站脚本攻击）
+      Cross Site Request Forgery (CSRF， 跨站请求伪造)
+      Session hijacking attack（Session 挟持）
+      File inclusion vulnerability（文件包含漏洞）
+      file upload attack（文件上传攻击）
+      Weak Password Vulnerability（弱密码暴力破解）
+      webshell（web 后门攻击）
+      SQL Injection（SQL 注入）
+      Distributed Denial of Service （DDoS， 分布式拒绝服务）
       XXE
       SSRF
-      DDOS
-      点击劫持ClickJacking
-      密码暴力破解
       业务逻辑漏洞：
         1）密码重置漏洞
         2）认证：（Cookie与Session、Outh2.0）
