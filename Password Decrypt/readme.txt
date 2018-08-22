@@ -9,6 +9,7 @@ FTP弱密码破解：
   解释说明：
       ftpScanner.py是FTP弱密码破解的文件
       pwd.txt是自己选择的密码本：格式为username:password
+FTP暴力破解防御：http://www.freebuf.com/column/180296.html
 
 Zip文件密码暴力破解：
   使用命令：
