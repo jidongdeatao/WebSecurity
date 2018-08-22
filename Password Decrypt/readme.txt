@@ -6,5 +6,10 @@ https://github.com/jidongdeatao/Security-Tools-List
 FTP弱密码破解：
   使用命令：
   python3 ftpScanner.py -H 127.0.0.1 -f pwd.txt
-  解释说明：ftpScanner.py是FTP弱密码破解的文件
+  解释说明：
+      ftpScanner.py是FTP弱密码破解的文件
       pwd.txt是自己选择的密码本
+
+Zip文件密码暴力破解：
+  使用命令：
+  
