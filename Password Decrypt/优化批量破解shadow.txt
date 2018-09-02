@@ -1,0 +1,216 @@
+一般在对客户所有linux机器进行弱口令检查时，如果在线进行破解的话，先不说影响业务，破解速率很慢，而且必须保证可以破解期间保持访问。
+这时将在线破解变成让客户提供shadow，我们破解shadow就有优势多了。后来k哥提供了一个批量调用john the ripper破解shadow的bash脚本。
+但是有诸多局限性，故深入研究优化了一下，并已此文做个记录。如各位有更优秀的解决方案，欢迎交流！
+0x01思路
+
+公司大神写的脚本
+#!/bin/sh
+for i in `ls ./shadow/`;
+do
+echo "---------------$i---------------"
+john --single ./shadow/$i;
+john --wordlist=10W.txt ./shadow/$i;
+john --format=crypt --wordlist=10W.txt ./shadow/$i;
+john --format=sha512crypt --wordlist=10W.txt ./shadow/$i;
+john --show ./shadow/$i > /tmp/$i.result;
+done;
+通过了解脚本的源码，发现存在一下局限性：
+* 速度慢，耗时间
+* 不精准
+* 无法查看破解进度
+* 如果暂停破解，后面不好恢复到当前破解进度
+针对上局限性，我思考了一下解决方法：
+* 通过去掉空密码账号，减少时间消耗
+* 对shadow中的hash类型进行识别，实现精准破解
+* 将多个shadow合成一个shadow，这样就可以查看进度，同时需要暂停的话，后面好恢复任务。
+用图1对以上方法做了一个流程化的梳理
+图1-解决方案流程图
+0x01shadow格式简介
+在破解之前我们先了解一下shadow格式
+root:$1$v2wT9rQF$XSpGgoB93STC4EFSlgpjg1:14181:0:99999:7:::
+可以发现shadow中每一行对应这一个用户的用户名和密码等信息，格式为0:1:2:3:4:5:6:7:8
+冒号是分割符，分别代表着，每个字段分别代表着：
+0:用户名
+1:密码hash值
+2:密码修改距离1970年1月1日的时间
+3:密码将被允许修改之前的天数（0 表示“可在任何时间修改”）
+4:系统将强制用户修改为新密码之前的天数（1 表示“永远都不能修改”）
+5:密码过期之前，用户将被警告过期的天数（-1 表示“没有警告”）
+6:密码过期之后，系统自动禁用帐户的天数（-1 表示“永远不会禁用”）
+7:该帐户被禁用的天数（-1 表示“该帐户被启用”）
+8:保留供将来使用
+hash值一览格式如：$id$salt$密文
+id代表的是使用不同的加密算法，不同的系统使用的算法也不尽相同。salt是加密的时候需要用到盐。最后就是密文。
+数字和所使用的加密算法对应关系：
+格式
+算法
+$1 
+md5 
+$2a 
+blowfish 
+$2y 
+blowfish 
+$5 
+sha-256 
+$6 
+sha-512 
+注意：如果密码字符串为*，表示系统用户不能被登入，为!表示用户名被禁用，如果密码字符串为空，表示没有密码。
+
+
+0x02整理shadow
+为了提高破解的效率，提高精确度，我们将从多个shadow文件中提取出满足以下条件的用户，并合成一个shadow文件：
+* 去除空密码账号
+* 每个账号的密码加密方式不一样，破解时要选择对应的算法，所以将密码进行分类。
+* 筛选处我们要破解的用户
+为此特地写了一个脚本shadowFilter.py，来快速批量处理shadow文件（如果想了解该脚本的各个参数作用，请看我的github）。
+脚本地址：
+https://github.com/c0ny1/WorkScripts/blob/master/crack-shadow-helper/ShadowFilter.py
+比如：我们需要破解shadow目录下的所有shadow文件中，root和test的账号的密码，可以进行如下整理：
+python shadowFilter.py -d F:\shadow\ -c 1 -iuser root -o hashcat_crack.shadow #输出适合hashcat破解的格式
+python shadowFilter.py -d F:\shadow\ -iuser root -o john_crack.shadow #输出适合john the ripper破解的格式
+注意：-c代表的是需要哪一列，shadow的格式是0:1:2:3:4:5:6:7:8,0列是用户，1列是密码等等。hashcat破解是只需要1列，john需要全部列！
+0x03使用hashid识别hash类型
+
+hashid.py是一个可以识别多种hash类的脚本，同时它可以输出hashcat和john the ripper破解该类型的格式。参数如下：
+参数
+描述
+INPUT 
+输入的HASH（默认值：STDIN） 
+-e, –extended 
+列出所有包括咸密码散列算法 
+-m, –mode 
+显示相应hashcat模式输出 
+-j, –john 
+显示相应JohnTheRipper格式输出 
+-o FILE, –outfile FILE 
+写输出文件(默认值:STDOUT) 
+–help 
+显示帮助信息 
+–version 
+显示程序的版本号 
+识别crack.shadow中所有hash的类型，并输出相应hashcat和john the ripper破解格式
+hashid -m -j crack.shadow
+0x04使用工具进行破解
+
+(1)使用hashcat破解
+
+hashcat64.exe -a 0 -m 500 out.shadow 10W.txt #500为hashcat识别出
+hashcat64.exe --show out.shadow > pwd.txt #查看结果
+(2)使用john the ripper破解
+
+john --single out.shadow
+john --format=md5crypt --wordlist=10W.txt out.shadow #md5crypt为hashid识别出
+john --show out.shadow >pwd.txt #查看结果
+这个两个工具在破解hash方面都是神器，支持大部分的hash类型破解。如果你有linux服务器，推荐使用john the ripper挂在上面日夜跑着。如果你在windows上，同时对速度有要求的话，推荐使用hashcat,并使用GPU破解来加快数据，还嫌不够快的童鞋可以研究hashcat分布式破解了！
+0x05整理结果
+
+在破解完成后，我们需要将破解好的密码关联到某主机的某个账号。同样使用脚本批量处理：
+https://github.com/c0ny1/WorkScripts/blob/master/crack-shadow-helper/SearchPwdFromShadow.py
+python SearchPwdFromShadow.py -d F:\shadow\ -p pwd.txt -o result.txt
+
+
+SearchPwdFromShadow.py代码如下：
+#coding=utf-8
+
+import os
+import re
+import optparse
+
+SHADOW = 0
+NUM = 0
+ERR = []
+
+# 检查shadow每行的格式是否正确
+def shadowcheck(hashlist):
+	n = hashlist.count(':')
+	if n != 8:
+		return False
+	else:
+		return True
+
+# 获取文件名
+def getFileName(fileName):
+	return os.path.basename(fileName)
+
+# 在shadow文件中搜索密码
+def searchPwd(shadowFile,pwdFile):
+	global NUM
+	global ERR
+	sopen = open(shadowFile,"r")
+	
+	textlist = []
+	
+	for shadowline in sopen:
+		shadowline = shadowline.strip('\n').strip('\r')
+		if not shadowcheck(shadowline):
+			print '[-] this is not shadow file :' + shadowline 
+			ERR.append(getFileName(shadowFile))
+			return 
+		
+		username = shadowline.split(':')[0]
+		popen = open(pwdFile,"r")
+		for hashlist in popen:
+			hash = hashlist.split(':')[0]
+			if hash in shadowline:
+				shadowfilename = getFileName(shadowFile)
+				text = "%s:%s:%s" % (shadowfilename,username,hashlist)
+				textlist.append(text.strip('\n').strip('\r'))
+				NUM += 1
+		popen.close()
+	
+	sopen.close()
+	return textlist
+		
+	
+def search(shadowDir,pwdFile,outFile):
+	global SHADOW
+	pathDir = os.listdir(shadowDir)
+	for allDir in pathDir:
+		child = os.path.join('%s%s' % (shadowDir,allDir))
+		
+		if os.path.isfile(child):
+			SHADOW += 1
+			print '[file]' + allDir.decode('gbk')
+			textlist = searchPwd(child,pwdFile)
+			write4file(textlist,outFile)
+	
+
+def write4file(textList,outFile):
+	if textList == None:
+		return 
+	f = open(outFile,'a')
+	for text in textList:
+		f.write(text)
+		f.write('\n')
+		print '[+]' + text
+	f.close()
+	
+	
+def main():
+	parser = optparse.OptionParser('python SearchPwdFromShadow.py -d <shadow dir> -p <pwd file> -o <out file>')
+	parser.add_option('-d',dest='shadowDir',type="string",help="specify shadow file")
+	parser.add_option('-p',dest='pwdFile',type="string",help="specify pwd file")
+	parser.add_option('-o',dest='outFile',type="string",help="specify out file")
+
+	(options,args) = parser.parse_args()
+	shadowDir = options.shadowDir
+	pwdFile = options.pwdFile
+	outFile = options.outFile
+
+	if shadowDir == None or pwdFile == None:
+		print parser.usage
+		exit(0)
+		
+	if outFile == None:
+		outFile = 'out.txt'
+
+	search(shadowDir,pwdFile,outFile)
+	
+	print '----------------------------finish------------------------'
+	print 'Number of shadows: %d' % SHADOW
+	print 'Password found: %d' % NUM
+	print 'Bad format: %s' % str(ERR)
+	
+
+if __name__ == '__main__':
+    main()
