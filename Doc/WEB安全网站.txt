@@ -30,3 +30,20 @@ testaspnet.vulnweb.com
 
 在线漏洞数据库:
 web.archivw.org
+
+
+   
+https://nosec.org
+启明星辰
+
+1. Penetration Testing Framework
+2. Report Template
+3. http://www.phenoelit.de/dpl/dpl.html
+4. http://snakeoillabs.com/downloads/GHDB.xml
+5. http://www.eccouncil.org/Course-
+Outline/Ethical%20Hacking%20and%20Countermeasures%20Course.htm
+6. http://www.owasp.org/index.php/OWASP_Testing_Project
+7. http://www.red-database-security.com
+8. http://www.petefinnigan.com
+9. http://www.insomniasec.com/releases/whitepapers-presentations
+10. http://www.isecom.org/osstmm/
