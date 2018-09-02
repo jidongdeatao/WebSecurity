@@ -63,4 +63,31 @@ WEB安全分为四大模块：
       
       
   
+添加到SecurityTools
+破解SSH，shadow密码
+
+
+
+
+添加到WEBSecurity
+一、业务逻辑漏洞（Logic error vulnerability）
+定义：由于程序逻辑不严谨导致
+特性：非常隐蔽，一般出现在功能（业务流程上），这是漏洞扫描工具无法识别的
+常见分类：1.密码重置问题
+                   2.cookies验证问题
+                   3.越权操作问题
+
+二、上传漏洞
+利用put,move等http请求方法
+本地图片
+三、密码暴力破解
+引用Security Tools工具
+本地保存图片暴力破解分为c/s 与b/s
+四、命令执行漏洞
+本地图片
+五、文件包含漏洞
+本地图片
+
+利用搜索引擎搜索信息添加到GOOGLE Hacking中
+已保存到本地图片
      
