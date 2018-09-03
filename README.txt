@@ -63,12 +63,6 @@ WEB安全分为四大模块：
   5.使用网站后门维持访问
       
       
-  
-添加到SecurityTools
-破解SSH，shadow密码
-
-
-
 
 添加到WEBSecurity
 一、业务逻辑漏洞（Logic error vulnerability）
